@@ -24,6 +24,13 @@ declare const worker: {
 export default worker;
 `);
 
+const assetsIgnore = path.resolve('.svelte-kit/cloudflare/.assetsignore');
+const exclusions = new Set(existsSync(assetsIgnore)
+	? (await readFile(assetsIgnore, 'utf8')).split('\n').filter(Boolean) : []);
+exclusions.add('_sveltekit.js');
+exclusions.add('_sveltekit.d.ts');
+await writeFile(assetsIgnore, `${[...exclusions].join('\n')}\n`);
+
 if (!existsSync(generated)) {
 	throw new Error('Expected .svelte-kit/cloudflare/_worker.js after `vite build`.');
 }
