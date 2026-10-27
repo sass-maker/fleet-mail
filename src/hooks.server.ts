@@ -4,6 +4,7 @@ import { getUserByApiToken, readBearerToken } from '$lib/server/api-tokens';
 import { getUserByOAuthToken } from '$lib/server/oauth';
 import {
 	countUsers,
+	getUserByEmail,
 	getAuthenticatedSession,
 	readSessionToken,
 	sessionCookieOptions,
@@ -19,6 +20,7 @@ import {
 } from '$lib/server/constants';
 import { listAddressesForUser, listDomains } from '$lib/server/domains';
 import { loginHref, safeNextPath } from '$lib/next-url';
+import { ownerAccessOriginAllowed, ownerAccessRouteBlocked, verifyOwnerAccess } from '$lib/server/owner-access';
 import { getUserLocale } from '$lib/server/locale';
 import { getUserUiTheme } from '$lib/server/ui-theme';
 import { BUILTIN_THEME_IDS, DEFAULT_UI_THEME, parseThemeId } from '$lib/ui-theme/ids';
@@ -128,6 +130,27 @@ export const handle: Handle = async ({ event, resolve }) => {
 		matchLocale(event.cookies.get(LOCALE_COOKIE)) ??
 		localeFromAcceptLanguage(event.request.headers.get('accept-language'));
 
+	let accessOwner: App.Locals['user'] = null;
+	if (event.platform?.env.ACCESS_AUTH_ENABLED === 'true') {
+		const email = await verifyOwnerAccess(event.request, event.platform.env);
+		if (!email || !db) return jsonError('Cloudflare Access sign-in required', 403);
+		if (!ownerAccessOriginAllowed(event.request)) return jsonError('Invalid origin', 403);
+		if (ownerAccessRouteBlocked(pathname, event.request.method)) {
+			return jsonError('This instance uses owner-only Cloudflare Access login', 403);
+		}
+		const account = await getUserByEmail(db, email);
+		if (!account?.is_admin || account.must_change_password) {
+			return jsonError('Owner account is not provisioned', 503);
+		}
+		const { password_hash: _passwordHash, ...user } = account;
+		accessOwner = user;
+		if (pathname === '/api/auth/login' && event.request.method === 'DELETE') {
+			return new Response(JSON.stringify({ ok: true, next: '/cdn-cgi/access/logout' }), {
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+	}
+
 	if (isMcpPath(pathname)) {
 		if (event.request.method === 'OPTIONS') {
 			return new Response(null, { status: 204, headers: corsHeaders(event.request) });
@@ -178,7 +201,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 		}
 
-		if (cookieSession && !cookieSession.isMobile) {
+		if (accessOwner) {
+			event.locals.user = accessOwner;
+			event.locals.authMethod = 'session';
+		} else if (cookieSession && !cookieSession.isMobile) {
 			event.locals.user = cookieSession.user;
 			event.locals.currentSessionId = cookieSession.sessionId;
 			event.locals.authMethod = 'session';

@@ -1,81 +1,53 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "quickmail",
+	"name": "fleet-mail",
+	"account_id": "7d048325699a5acddb44d3be31cf6ba9",
 	"main": ".svelte-kit/cloudflare/_worker.js",
-	"compatibility_date": "2025-06-01",
-	"compatibility_flags": ["nodejs_compat", "enable_nodejs_http_modules"],
+	"compatibility_date": "2026-10-27",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"enable_nodejs_http_modules"
+	],
 	"workers_dev": true,
-
-	// Your Cloudflare account is picked up from `wrangler login`. If you belong
-	// to more than one account, set CLOUDFLARE_ACCOUNT_ID in your environment
-	// or uncomment this and paste the ID from the Cloudflare dashboard sidebar.
-	// "account_id": "",
-
-	// Deploys to <name>.<your-subdomain>.workers.dev out of the box. To serve it
-	// from your own domain instead, uncomment this and make sure the zone is on
-	// the same Cloudflare account.
-	// "routes": [
-	// 	{
-	// 		"pattern": "mail.example.com",
-	// 		"custom_domain": true
-	// 	}
-	// ],
-
+	"preview_urls": false,
 	"assets": {
 		"directory": ".svelte-kit/cloudflare",
 		"binding": "ASSETS"
 	},
-
-	// Prefer `bun run setup` (or `bash scripts/setup.sh`) over editing this by hand.
-	// Mail provider is selected by EMAIL_PROVIDER (resend | cloudflare).
-	// Resend secrets (when EMAIL_PROVIDER=resend or unset):
-	//   wrangler secret put RESEND_API_KEY
-	//   wrangler secret put RESEND_WEBHOOK_SECRET
-	// Optional inbox tabs (TypeSafe):
-	//   wrangler secret put TYPESAFE_API_KEY
-	// Cloudflare Email uses the send_email binding below plus CLOUDFLARE_MAIL_DOMAINS.
-	// Locally, put values in .dev.vars (copy .dev.vars.example).
-
 	"vars": {
-		"EMAIL_PROVIDER": "resend",
-		// Dashboard form requires a non-empty value. Keep example.com for
-		// Resend; replace with your domain when EMAIL_PROVIDER=cloudflare.
-		"CLOUDFLARE_MAIL_DOMAINS": "example.com"
+		"EMAIL_PROVIDER": "cloudflare",
+		"CLOUDFLARE_MAIL_DOMAINS": "aliveville.com,codevetter.com,daddyrad.com,heypace.app,highsignal.app,karte.cc,posttrainllm.com,rolepatch.com,sarthakagrawal.dev,sassmaker.com,significanthobbies.com",
+		"API_SEND_ENABLED": "false",
+		"ACCESS_AUTH_ENABLED": "true",
+		"ACCESS_TEAM_DOMAIN": "https://long-frog-c8a6.cloudflareaccess.com",
+		"ACCESS_AUD": "7640cf667275edec959f017d47e84a675681f62fc409e3771d0c54731bbe7a80",
+		"ACCESS_OWNER_EMAIL": "sarthakagrawal927@gmail.com",
+		"APP_URL": "https://fleet-mail.sarthakagrawal927.workers.dev"
 	},
-
 	"send_email": [
 		{
 			"name": "EMAIL",
 			"remote": true
 		}
 	],
-
-	// Workers AI, offered to admins as the instance's drafting provider. Unused
-	// (and unbilled) until an admin picks it under Admin › AI drafting.
-	"ai": {
-		"binding": "AI",
-		"remote": true
-	},
-
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "quickmail",
-			// `bun run setup` fills this in, or: wrangler d1 create <name>
-			"database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+			"database_name": "fleet-mail",
+			"database_id": "ae8e598f-cee1-483a-b86d-f1f6055c22ee",
 			"migrations_dir": "migrations"
 		}
 	],
-
 	"r2_buckets": [
 		{
 			"binding": "ATTACHMENTS",
-			// `bun run setup` creates this, or: wrangler r2 bucket create <name>
-			"bucket_name": "quickmail-attachments"
+			"bucket_name": "fleet-mail-attachments"
 		}
 	],
-
 	"observability": {
-		"enabled": true
+		"enabled": true,
+		"traces": {
+			"enabled": true
+		}
 	}
 }

@@ -1,3 +1,11 @@
+# Fleet Mail private deployment
+
+This repository deploys Quickinbox for one owner on Cloudflare. Use `pnpm install --frozen-lockfile`, `pnpm run check`, `pnpm test`, and `pnpm run build`. Production uses Cloudflare Access email-code sign-in; the app verifies the signed assertion and opens the pre-provisioned owner account without a second password. Configuration lives in `wrangler.jsonc`.
+
+The upstream Quickinbox UI and MIT license are retained. The reference documentation below describes upstream features; optional AI, notifications, and API/MCP sending are not enabled for this deployment. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for verified scope.
+
+---
+
 # Quickinbox
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/DivinPrince/quickinbox)
