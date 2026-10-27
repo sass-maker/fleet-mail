@@ -8,6 +8,7 @@
 	import { INBOX_CATEGORIES, categoryNavKey, categoryUnread } from '$lib/mail/categories';
 	import { t } from '$lib/i18n';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import DomainSwitcher from '$lib/components/DomainSwitcher.svelte';
 	import LabelChip from '$lib/components/LabelChip.svelte';
 	import type {
 		MailboxCounts,
@@ -318,6 +319,9 @@
 			>
 				{t('nav.starred')}
 			</button>
+			<div class="z-domain-filter">
+				<DomainSwitcher domains={$page.data.domains ?? []} activeDomainId={$page.data.activeDomainId ?? null} />
+			</div>
 		</div>
 
 		<div class="z-rows">

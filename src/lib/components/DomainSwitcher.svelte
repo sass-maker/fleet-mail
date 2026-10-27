@@ -2,6 +2,7 @@
 	import Icon from './Icon.svelte';
 	import { t } from '$lib/i18n';
 	import type { Domain } from '$lib/types';
+	import { domainFilterHref } from '$lib/domain-filter';
 
 	let {
 		domains,
@@ -16,24 +17,29 @@
 
 	let open = $state(false);
 	let switching = $state(false);
+	let error = $state('');
 
 	const active = $derived(domains.find((domain) => domain.id === activeDomainId) ?? null);
 	const label = $derived(active?.name ?? t('domains.all'));
 
 	async function select(domainId: string | null) {
-		if (domainId === activeDomainId) {
+		if (domainId === activeDomainId && !new URL(window.location.href).searchParams.has('address')) {
 			open = false;
 			return;
 		}
 
 		switching = true;
+		error = '';
 		try {
-			await fetch('/api/domains/select', {
+			const response = await fetch('/api/domains/select', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ domainId })
 			});
-			window.location.reload();
+			if (!response.ok) throw new Error('Could not switch domains. Please try again.');
+			window.location.assign(domainFilterHref(new URL(window.location.href)));
+		} catch (cause) {
+			error = cause instanceof Error ? cause.message : 'Could not switch domains. Please try again.';
 		} finally {
 			switching = false;
 			open = false;
@@ -48,6 +54,7 @@
 			type="button"
 			class="switcher-trigger"
 			aria-haspopup="listbox"
+			aria-label={`${t('nav.domains')}: ${label}`}
 			aria-expanded={open}
 			disabled={switching}
 			onclick={() => (open = !open)}
@@ -103,6 +110,8 @@
 {:else if domains.length === 1}
 	<span class="single-domain" title={domains[0].name}>{domains[0].name}</span>
 {/if}
+
+{#if error}<p role="alert">{error}</p>{/if}
 
 <style>
 	.switcher {
@@ -160,6 +169,8 @@
 		left: 0;
 		z-index: 30;
 		min-width: 13rem;
+		max-height: min(24rem, 50dvh);
+		overflow-y: auto;
 		padding: 0.25rem;
 		background: var(--color-surface);
 		border-radius: 0.75rem;

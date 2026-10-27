@@ -623,6 +623,11 @@
 	padding: 0.45rem 0.75rem 0.3rem;
 }
 
+[data-ui-theme='zero'] .z-domain-filter {
+	margin-left: auto;
+	min-width: 0;
+}
+
 [data-ui-theme='zero'] .z-category-tabs {
 	display: flex;
 	gap: 0.125rem;
