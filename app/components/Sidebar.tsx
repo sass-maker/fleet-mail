@@ -15,6 +15,9 @@ import {
 	TrashIcon,
 	TrayIcon,
 } from "@phosphor-icons/react";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "~/queries/keys";
+import api from "~/services/api";
 import { useMemo, useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router";
 import { Folders, SYSTEM_FOLDER_IDS } from "shared/folders";
@@ -47,13 +50,7 @@ interface FolderLinkProps {
 	onClick?: () => void;
 }
 
-function FolderLink({
-	to,
-	icon,
-	label,
-	unreadCount,
-	onClick,
-}: FolderLinkProps) {
+function FolderLink({ to, icon, label, unreadCount, onClick }: FolderLinkProps) {
 	return (
 		<NavLink
 			to={to}
@@ -68,9 +65,7 @@ function FolderLink({
 		>
 			<span className="shrink-0">{icon}</span>
 			<span className="truncate flex-1">{label}</span>
-			{unreadCount != null && unreadCount > 0 && (
-				<Badge variant="secondary">{unreadCount}</Badge>
-			)}
+			{unreadCount != null && unreadCount > 0 && <Badge variant="secondary">{unreadCount}</Badge>}
 		</NavLink>
 	);
 }
@@ -79,7 +74,12 @@ export default function Sidebar() {
 	const { mailboxId } = useParams<{ mailboxId: string }>();
 	const navigate = useNavigate();
 	const { data: allMailboxes = [] } = useMailboxes();
-	const groups = groupMailboxes([...new Set(allMailboxes.map((mailbox) => mailbox.email.split("@")[1]))].sort(), allMailboxes);
+	const { data: config } = useQuery({
+		queryKey: queryKeys.config,
+		queryFn: () => api.getConfig(),
+		staleTime: Infinity,
+	});
+	const groups = groupMailboxes(config?.domains || [], allMailboxes);
 	const { data: folders = [] } = useFolders(mailboxId);
 	const createFolderMutation = useCreateFolder();
 	const { startCompose, closeSidebar } = useUIStore();
@@ -88,8 +88,7 @@ export default function Sidebar() {
 	const [newFolderName, setNewFolderName] = useState("");
 
 	const customFolders = useMemo(
-		() =>
-			folders.filter((f) => !(SYSTEM_FOLDER_IDS as readonly string[]).includes(f.id)),
+		() => folders.filter((f) => !(SYSTEM_FOLDER_IDS as readonly string[]).includes(f.id)),
 		[folders],
 	);
 
@@ -140,9 +139,7 @@ export default function Sidebar() {
 					<span>Mailboxes</span>
 				</button>
 				<div className="px-1">
-					<div className="text-base font-semibold text-kumo-default truncate">
-						{displayName}
-					</div>
+					<div className="text-base font-semibold text-kumo-default truncate">{displayName}</div>
 					<div className="text-sm text-kumo-subtle truncate mt-0.5">
 						{currentMailbox?.email || mailboxId}
 					</div>
@@ -174,13 +171,30 @@ export default function Sidebar() {
 					/>
 				))}
 
-    <div className="pt-5 pb-2">
-     <h2 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-kumo-subtle">Domains</h2>
-     {groups.map(({ domain, addresses }) => <details key={domain} open={domain === mailboxId?.split("@")[1]} className="mb-1">
-      <summary className="cursor-pointer break-all rounded-md px-3 py-2 text-sm font-medium text-kumo-default hover:bg-kumo-tint">{domain}</summary>
-      <div className="pl-3">{addresses.map((address) => <NavLink key={address.id} to={`/mailbox/${encodeURIComponent(address.id)}/emails/inbox`} onClick={handleNavClick} className={`block break-all rounded-md px-3 py-2 text-sm ${address.id === mailboxId ? "bg-kumo-fill font-semibold text-kumo-default" : "text-kumo-strong hover:bg-kumo-tint"}`}>{address.email.split("@")[0]}</NavLink>)}</div>
-     </details>)}
-    </div>
+				<div className="pt-5 pb-2">
+					<h2 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-kumo-subtle">
+						Domains
+					</h2>
+					{groups.map(({ domain, addresses }) => (
+						<details key={domain} open={domain === mailboxId?.split("@")[1]} className="mb-1">
+							<summary className="cursor-pointer break-all rounded-md px-3 py-2 text-sm font-medium text-kumo-default hover:bg-kumo-tint">
+								{domain}
+							</summary>
+							<div className="pl-3">
+								{addresses.map((address) => (
+									<NavLink
+										key={address.id}
+										to={`/mailbox/${encodeURIComponent(address.id)}/emails/inbox`}
+										onClick={handleNavClick}
+										className={`block break-all rounded-md px-3 py-2 text-sm ${address.id === mailboxId ? "bg-kumo-fill font-semibold text-kumo-default" : "text-kumo-strong hover:bg-kumo-tint"}`}
+									>
+										{address.email.split("@")[0]}
+									</NavLink>
+								))}
+							</div>
+						</details>
+					))}
+				</div>
 
 				{/* Custom folders */}
 				{customFolders.length > 0 && (
@@ -236,14 +250,9 @@ export default function Sidebar() {
 			</nav>
 
 			{/* Create folder dialog */}
-			<Dialog.Root
-				open={isCreateFolderOpen}
-				onOpenChange={setIsCreateFolderOpen}
-			>
+			<Dialog.Root open={isCreateFolderOpen} onOpenChange={setIsCreateFolderOpen}>
 				<Dialog size="sm" className="p-6">
-					<Dialog.Title className="text-base font-semibold mb-4">
-						Create folder
-					</Dialog.Title>
+					<Dialog.Title className="text-base font-semibold mb-4">Create folder</Dialog.Title>
 					<form onSubmit={handleCreateFolder} className="space-y-4">
 						<Input
 							label="Folder name"
@@ -260,11 +269,7 @@ export default function Sidebar() {
 									</Button>
 								)}
 							/>
-							<Button
-								type="submit"
-								variant="primary"
-								disabled={!newFolderName.trim()}
-							>
+							<Button type="submit" variant="primary" disabled={!newFolderName.trim()}>
 								Create
 							</Button>
 						</div>

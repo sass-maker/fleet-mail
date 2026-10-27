@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -16,20 +17,11 @@ export default function MailboxRoute() {
 	// Prefetch mailbox data for child components
 	useMailbox(mailboxId);
 	const prevMailboxIdRef = useRef<string | undefined>(undefined);
-	const {
-		isSidebarOpen,
-		closeSidebar,
-		isAgentPanelOpen,
-		closePanel,
-		closeComposeModal,
-	} = useUIStore();
+	const { isSidebarOpen, closeSidebar, isAgentPanelOpen, closePanel, closeComposeModal } =
+		useUIStore();
 
 	useEffect(() => {
-		if (
-			prevMailboxIdRef.current &&
-			mailboxId &&
-			prevMailboxIdRef.current !== mailboxId
-		) {
+		if (prevMailboxIdRef.current && mailboxId && prevMailboxIdRef.current !== mailboxId) {
 			closePanel();
 			closeComposeModal();
 			closeSidebar();
@@ -43,7 +35,7 @@ export default function MailboxRoute() {
 			{/* Mobile sidebar overlay backdrop */}
 			{isSidebarOpen && (
 				<div
-					className="fixed inset-0 z-30 bg-black/30 md:hidden"
+					className="fixed inset-0 z-30 bg-black/30 xl:hidden"
 					onClick={closeSidebar}
 					onKeyDown={(e) => e.key === "Escape" && closeSidebar()}
 					role="button"
@@ -54,8 +46,9 @@ export default function MailboxRoute() {
 
 			{/* Sidebar: hidden on mobile by default, shown as overlay when open */}
 			<div
-				className={`fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 md:z-0 ${
-					isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+				id="mailbox-navigation"
+				className={`fixed inset-y-0 left-0 z-40 w-64 xl:relative xl:inset-auto xl:z-0 xl:block xl:shrink-0 ${
+					isSidebarOpen ? "block" : "hidden"
 				}`}
 			>
 				<Sidebar />
@@ -71,7 +64,7 @@ export default function MailboxRoute() {
 
 			{/* Agent + MCP sidebar -- togglable on desktop */}
 			{isAgentPanelOpen && (
-				<div className="hidden lg:flex w-[380px] shrink-0 border-l border-kumo-line flex-col bg-kumo-base overflow-hidden">
+				<div className="hidden 2xl:flex w-[380px] shrink-0 border-l border-kumo-line flex-col bg-kumo-base overflow-hidden">
 					<AgentSidebar />
 				</div>
 			)}

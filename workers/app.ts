@@ -33,9 +33,7 @@ function getAccessUrls(teamDomain: string) {
 	const certsPath = "/cdn-cgi/access/certs";
 	const teamUrl = new URL(teamDomain);
 	const issuer = teamUrl.origin;
-	const certsUrl = teamUrl.pathname.endsWith(certsPath)
-		? teamUrl
-		: new URL(certsPath, issuer);
+	const certsUrl = teamUrl.pathname.endsWith(certsPath) ? teamUrl : new URL(certsPath, issuer);
 
 	return { issuer, certsUrl };
 }

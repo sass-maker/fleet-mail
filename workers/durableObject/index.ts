@@ -48,7 +48,7 @@ const SORT_COLUMN_MAP = {
 	date: schema.emails.date,
 	read: schema.emails.read,
 	starred: schema.emails.starred,
-} satisfies Record<SortColumn, typeof schema.emails[keyof typeof schema.emails]>;
+} satisfies Record<SortColumn, (typeof schema.emails)[keyof typeof schema.emails]>;
 
 interface SearchFilterOptions {
 	query: string;
@@ -127,9 +127,7 @@ export class MailboxDO extends DurableObject<Env> {
 		// Cap pagination limit to prevent unbounded queries
 		const limit = Math.min(Math.max(rawLimit, 1), 100);
 
-		const sortColumn: SortColumn = ALLOWED_SORT_COLUMNS.includes(
-			rawSortColumn as SortColumn,
-		)
+		const sortColumn: SortColumn = ALLOWED_SORT_COLUMNS.includes(rawSortColumn as SortColumn)
 			? rawSortColumn
 			: "date";
 
@@ -189,9 +187,7 @@ export class MailboxDO extends DurableObject<Env> {
 		const params: (string | number)[] = [];
 
 		if (folder) {
-			conditions.push(
-				"folder_id = (SELECT id FROM folders WHERE name = ?1 OR id = ?1 LIMIT 1)",
-			);
+			conditions.push("folder_id = (SELECT id FROM folders WHERE name = ?1 OR id = ?1 LIMIT 1)");
 			params.push(folder);
 		}
 
@@ -200,13 +196,9 @@ export class MailboxDO extends DurableObject<Env> {
 			params.push(thread_id);
 		}
 
-		const where =
-			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+		const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 		const row = [
-			...this.ctx.storage.sql.exec(
-				`SELECT COUNT(*) as total FROM emails ${where}`,
-				...params,
-			),
+			...this.ctx.storage.sql.exec(`SELECT COUNT(*) as total FROM emails ${where}`, ...params),
 		][0] as { total: number } | undefined;
 
 		return row?.total ?? 0;
@@ -215,11 +207,7 @@ export class MailboxDO extends DurableObject<Env> {
 	// ── Threaded queries (raw SQL — too complex for Drizzle's builder) ──
 
 	async getThreadedEmails(options: GetEmailsOptions = {}) {
-		const {
-			folder,
-			page = 1,
-			limit: rawLimit = 25,
-		} = options;
+		const { folder, page = 1, limit: rawLimit = 25 } = options;
 		const limit = Math.min(Math.max(rawLimit, 1), 100);
 
 		if (!folder) {
@@ -278,7 +266,9 @@ export class MailboxDO extends DurableObject<Env> {
 				WHERE lp.rn = 1
 				ORDER BY lp.date DESC
 				LIMIT ?2 OFFSET ?3`,
-				folder, limit, offset
+				folder,
+				limit,
+				offset,
 			);
 
 			const rows = [...result];
@@ -373,7 +363,9 @@ export class MailboxDO extends DurableObject<Env> {
 			WHERE lif.rn = 1
 			ORDER BY lif.date DESC
 			LIMIT ?2 OFFSET ?3`,
-			folder, limit, offset
+			folder,
+			limit,
+			offset,
 		);
 
 		const rows = [...result];
@@ -441,11 +433,7 @@ export class MailboxDO extends DurableObject<Env> {
 	// ── Single email operations (Drizzle) ──────────────────────────
 
 	async getEmail(id: string) {
-		const email = this.db
-			.select()
-			.from(schema.emails)
-			.where(eq(schema.emails.id, id))
-			.get();
+		const email = this.db.select().from(schema.emails).where(eq(schema.emails.id, id)).get();
 
 		if (!email) return null;
 
@@ -505,10 +493,7 @@ export class MailboxDO extends DurableObject<Env> {
 		}));
 	}
 
-	async updateEmail(
-		id: string,
-		{ read, starred }: { read?: boolean; starred?: boolean },
-	) {
+	async updateEmail(id: string, { read, starred }: { read?: boolean; starred?: boolean }) {
 		const data: { read?: number; starred?: number } = {};
 		if (read !== undefined) {
 			data.read = read ? 1 : 0;
@@ -521,11 +506,7 @@ export class MailboxDO extends DurableObject<Env> {
 			return this.getEmail(id);
 		}
 
-		this.db
-			.update(schema.emails)
-			.set(data)
-			.where(eq(schema.emails.id, id))
-			.run();
+		this.db.update(schema.emails).set(data).where(eq(schema.emails.id, id)).run();
 
 		return this.getEmail(id);
 	}
@@ -556,21 +537,14 @@ export class MailboxDO extends DurableObject<Env> {
 			.where(eq(schema.attachments.email_id, id))
 			.all();
 
-		this.db
-			.delete(schema.emails)
-			.where(eq(schema.emails.id, id))
-			.run();
+		this.db.delete(schema.emails).where(eq(schema.emails.id, id)).run();
 
 		return emailAttachments;
 	}
 
 	async getAttachment(id: string) {
 		return (
-			this.db
-				.select()
-				.from(schema.attachments)
-				.where(eq(schema.attachments.id, id))
-				.get() ?? null
+			this.db.select().from(schema.attachments).where(eq(schema.attachments.id, id)).get() ?? null
 		);
 	}
 
@@ -581,7 +555,10 @@ export class MailboxDO extends DurableObject<Env> {
 			.select({
 				id: schema.folders.id,
 				name: schema.folders.name,
-				unreadCount: sql<number>`COALESCE(SUM(CASE WHEN ${schema.emails.read} = 0 THEN 1 ELSE 0 END), 0)`.mapWith(Number),
+				unreadCount:
+					sql<number>`COALESCE(SUM(CASE WHEN ${schema.emails.read} = 0 THEN 1 ELSE 0 END), 0)`.mapWith(
+						Number,
+					),
 			})
 			.from(schema.folders)
 			.leftJoin(schema.emails, eq(schema.emails.folder_id, schema.folders.id))
@@ -627,10 +604,7 @@ export class MailboxDO extends DurableObject<Env> {
 			return false;
 		}
 
-		this.db
-			.delete(schema.folders)
-			.where(eq(schema.folders.id, id))
-			.run();
+		this.db.delete(schema.folders).where(eq(schema.folders.id, id)).run();
 
 		return true;
 	}
@@ -663,7 +637,18 @@ export class MailboxDO extends DurableObject<Env> {
 		options: SearchFilterOptions,
 		tableAlias = "",
 	): { conditions: string[]; params: (string | number)[] } {
-		const { query, folder, from, to, subject, date_start, date_end, is_read, is_starred, has_attachment } = options;
+		const {
+			query,
+			folder,
+			from,
+			to,
+			subject,
+			date_start,
+			date_end,
+			is_read,
+			is_starred,
+			has_attachment,
+		} = options;
 		const prefix = tableAlias ? `${tableAlias}.` : "";
 		const conditions: string[] = [];
 		const params: (string | number)[] = [];
@@ -680,20 +665,49 @@ export class MailboxDO extends DurableObject<Env> {
 			const p2 = addParam(`%${query}%`);
 			const p3 = addParam(`%${query}%`);
 			const p4 = addParam(`%${query}%`);
-			conditions.push(`(${prefix}subject LIKE ${p1} OR ${prefix}body LIKE ${p2} OR ${prefix}sender LIKE ${p3} OR ${prefix}recipient LIKE ${p4} OR ${prefix}cc LIKE ${p4} OR ${prefix}bcc LIKE ${p4})`);
+			conditions.push(
+				`(${prefix}subject LIKE ${p1} OR ${prefix}body LIKE ${p2} OR ${prefix}sender LIKE ${p3} OR ${prefix}recipient LIKE ${p4} OR ${prefix}cc LIKE ${p4} OR ${prefix}bcc LIKE ${p4})`,
+			);
 		}
 		if (folder) {
 			const p = addParam(folder);
-			conditions.push(`${prefix}folder_id = (SELECT id FROM folders WHERE name = ${p} OR id = ${p} LIMIT 1)`);
+			conditions.push(
+				`${prefix}folder_id = (SELECT id FROM folders WHERE name = ${p} OR id = ${p} LIMIT 1)`,
+			);
 		}
-		if (from) { const p = addParam(`%${from}%`); conditions.push(`${prefix}sender LIKE ${p}`); }
-		if (to) { const p = addParam(`%${to}%`); conditions.push(`(${prefix}recipient LIKE ${p} OR ${prefix}cc LIKE ${p} OR ${prefix}bcc LIKE ${p})`); }
-		if (subject) { const p = addParam(`%${subject}%`); conditions.push(`${prefix}subject LIKE ${p}`); }
-		if (date_start) { const p = addParam(date_start); conditions.push(`${prefix}date >= ${p}`); }
-		if (date_end) { const p = addParam(date_end); conditions.push(`${prefix}date <= ${p}`); }
-		if (is_read !== undefined) { const p = addParam(is_read ? 1 : 0); conditions.push(`${prefix}read = ${p}`); }
-		if (is_starred !== undefined) { const p = addParam(is_starred ? 1 : 0); conditions.push(`${prefix}starred = ${p}`); }
-		if (has_attachment) { conditions.push(`${prefix}id IN (SELECT DISTINCT email_id FROM attachments)`); }
+		if (from) {
+			const p = addParam(`%${from}%`);
+			conditions.push(`${prefix}sender LIKE ${p}`);
+		}
+		if (to) {
+			const p = addParam(`%${to}%`);
+			conditions.push(
+				`(${prefix}recipient LIKE ${p} OR ${prefix}cc LIKE ${p} OR ${prefix}bcc LIKE ${p})`,
+			);
+		}
+		if (subject) {
+			const p = addParam(`%${subject}%`);
+			conditions.push(`${prefix}subject LIKE ${p}`);
+		}
+		if (date_start) {
+			const p = addParam(date_start);
+			conditions.push(`${prefix}date >= ${p}`);
+		}
+		if (date_end) {
+			const p = addParam(date_end);
+			conditions.push(`${prefix}date <= ${p}`);
+		}
+		if (is_read !== undefined) {
+			const p = addParam(is_read ? 1 : 0);
+			conditions.push(`${prefix}read = ${p}`);
+		}
+		if (is_starred !== undefined) {
+			const p = addParam(is_starred ? 1 : 0);
+			conditions.push(`${prefix}starred = ${p}`);
+		}
+		if (has_attachment) {
+			conditions.push(`${prefix}id IN (SELECT DISTINCT email_id FROM attachments)`);
+		}
 
 		return { conditions, params };
 	}
@@ -795,23 +809,27 @@ export class MailboxDO extends DurableObject<Env> {
 	 * Returns null if under limit, or an error message string if exceeded.
 	 */
 	async checkSendRateLimit(): Promise<string | null> {
-		const hourRow = [...this.ctx.storage.sql.exec(
-			`SELECT COUNT(*) as cnt FROM emails
+		const hourRow = [
+			...this.ctx.storage.sql.exec(
+				`SELECT COUNT(*) as cnt FROM emails
 			 WHERE folder_id = ?1
 			   AND date >= datetime('now', '-1 hour')`,
-			Folders.SENT,
-		)][0] as { cnt: number } | undefined;
+				Folders.SENT,
+			),
+		][0] as { cnt: number } | undefined;
 
 		if ((hourRow?.cnt ?? 0) >= 20) {
 			return "Rate limit exceeded: max 20 emails per hour per mailbox";
 		}
 
-		const dayRow = [...this.ctx.storage.sql.exec(
-			`SELECT COUNT(*) as cnt FROM emails
+		const dayRow = [
+			...this.ctx.storage.sql.exec(
+				`SELECT COUNT(*) as cnt FROM emails
 			 WHERE folder_id = ?1
 			   AND date >= datetime('now', '-1 day')`,
-			Folders.SENT,
-		)][0] as { cnt: number } | undefined;
+				Folders.SENT,
+			),
+		][0] as { cnt: number } | undefined;
 
 		if ((dayRow?.cnt ?? 0) >= 100) {
 			return "Rate limit exceeded: max 100 emails per day per mailbox";
@@ -820,45 +838,158 @@ export class MailboxDO extends DurableObject<Env> {
 		return null;
 	}
 
- async beginDelivery(email: EmailData, attachments: AttachmentData[]) {
-  return this.ctx.storage.transactionSync(() => {
-   const existing = [...this.ctx.storage.sql.exec("SELECT fingerprint, status FROM send_attempts WHERE id = ?", email.id)][0] as { fingerprint: string; status: string } | undefined;
-   if (existing) {
-    if (existing.fingerprint !== email.delivery_fingerprint) throw new Error("Send ID already belongs to different content");
-    return { claimed: false, status: existing.status, id: email.id };
-   }
-   for (const [window, maximum] of [["-1 hour", 20], ["-1 day", 100]] as const) {
-    const row = [...this.ctx.storage.sql.exec(`SELECT COUNT(*) AS count FROM send_attempts WHERE julianday(created_at) >= julianday('now', ?)`, window)][0] as { count: number };
-    if (row.count >= maximum) throw new Error(`Send attempt limit exceeded: ${maximum} per ${window === "-1 hour" ? "hour" : "day"}`);
-   }
-   this.ctx.storage.sql.exec("INSERT INTO send_attempts (id, fingerprint, status, created_at) VALUES (?, ?, 'pending', ?)", email.id, email.delivery_fingerprint || "", email.date);
-   this.ctx.storage.sql.exec(`INSERT INTO emails (id,folder_id,subject,sender,recipient,cc,bcc,date,read,starred,body,in_reply_to,email_references,thread_id,raw_headers,delivery_status,delivery_fingerprint) VALUES (?,?,?,?,?,?,?,?,1,0,?,?,?,?,?,'pending',?)`, email.id, Folders.DRAFT, email.subject, email.sender, email.recipient, email.cc ?? null, email.bcc ?? null, email.date, email.body, email.in_reply_to ?? null, email.email_references ?? null, email.thread_id ?? email.id, email.raw_headers ?? null, email.delivery_fingerprint ?? null);
-   if (attachments.length) this.db.insert(schema.attachments).values(attachments).run();
-   return { claimed: true, status: "pending", id: email.id };
-  });
- }
+	async saveDraft(email: EmailData) {
+		this.ctx.storage.transactionSync(() => {
+			const existing = this.db
+				.select()
+				.from(schema.emails)
+				.where(eq(schema.emails.id, email.id))
+				.get();
+			const attempt = [
+				...this.ctx.storage.sql.exec("SELECT 1 FROM send_attempts WHERE id = ?", email.id),
+			][0];
+			if (
+				attempt ||
+				(existing && (existing.folder_id !== Folders.DRAFT || existing.delivery_status))
+			)
+				throw new Error("A send attempt cannot be replaced as a draft");
+			const values = {
+				id: email.id,
+				folder_id: Folders.DRAFT,
+				subject: email.subject,
+				sender: email.sender,
+				recipient: email.recipient,
+				cc: email.cc ?? null,
+				bcc: email.bcc ?? null,
+				date: email.date,
+				body: email.body,
+				in_reply_to: email.in_reply_to ?? null,
+				email_references: email.email_references ?? null,
+				thread_id: email.thread_id ?? email.id,
+			};
+			if (existing)
+				this.db.update(schema.emails).set(values).where(eq(schema.emails.id, email.id)).run();
+			else this.db.insert(schema.emails).values(values).run();
+		});
+	}
 
- async completeDelivery(id: string, messageId: string) {
-  this.ctx.storage.transactionSync(() => {
-   this.ctx.storage.sql.exec(`UPDATE emails SET folder_id = ?, delivery_status = 'accepted', message_id = ?, thread_id = CASE WHEN thread_id = id THEN ? ELSE thread_id END, read = 1 WHERE id = ?`, Folders.SENT, messageId, messageId, id);
-   this.ctx.storage.sql.exec("UPDATE send_attempts SET status = 'accepted' WHERE id = ?", id);
-  });
- }
+	async beginDelivery(email: EmailData, attachments: AttachmentData[]) {
+		return this.ctx.storage.transactionSync(() => {
+			const existing = [
+				...this.ctx.storage.sql.exec(
+					"SELECT fingerprint, status FROM send_attempts WHERE id = ?",
+					email.id,
+				),
+			][0] as { fingerprint: string; status: string } | undefined;
+			if (existing) {
+				if (existing.fingerprint !== email.delivery_fingerprint)
+					throw new Error("Send ID already belongs to different content");
+				return { claimed: false, status: existing.status, id: email.id };
+			}
+			const source = this.db
+				.select()
+				.from(schema.emails)
+				.where(eq(schema.emails.id, email.id))
+				.get();
+			if (source && (source.folder_id !== Folders.DRAFT || source.delivery_status))
+				throw new Error("Send ID does not identify an unsent draft");
+			for (const [window, maximum] of [
+				["-1 hour", 20],
+				["-1 day", 100],
+			] as const) {
+				const row = [
+					...this.ctx.storage.sql.exec(
+						`SELECT COUNT(*) AS count FROM send_attempts WHERE julianday(created_at) >= julianday('now', ?)`,
+						window,
+					),
+				][0] as { count: number };
+				if (row.count >= maximum)
+					throw new Error(
+						`Send attempt limit exceeded: ${maximum} per ${window === "-1 hour" ? "hour" : "day"}`,
+					);
+			}
+			this.ctx.storage.sql.exec(
+				"INSERT INTO send_attempts (id, fingerprint, status, created_at) VALUES (?, ?, 'pending', ?)",
+				email.id,
+				email.delivery_fingerprint || "",
+				email.date,
+			);
+			if (source) {
+				this.db
+					.update(schema.emails)
+					.set({
+						subject: email.subject,
+						sender: email.sender,
+						recipient: email.recipient,
+						cc: email.cc ?? null,
+						bcc: email.bcc ?? null,
+						date: email.date,
+						body: email.body,
+						in_reply_to: email.in_reply_to ?? null,
+						email_references: email.email_references ?? null,
+						thread_id: email.thread_id ?? email.id,
+						raw_headers: email.raw_headers ?? null,
+						delivery_status: "pending",
+						delivery_fingerprint: email.delivery_fingerprint ?? null,
+						read: 1,
+					})
+					.where(eq(schema.emails.id, email.id))
+					.run();
+				this.db.delete(schema.attachments).where(eq(schema.attachments.email_id, email.id)).run();
+			} else {
+				this.ctx.storage.sql.exec(
+					`INSERT INTO emails (id,folder_id,subject,sender,recipient,cc,bcc,date,read,starred,body,in_reply_to,email_references,thread_id,raw_headers,delivery_status,delivery_fingerprint) VALUES (?,?,?,?,?,?,?,?,1,0,?,?,?,?,?,'pending',?)`,
+					email.id,
+					Folders.DRAFT,
+					email.subject,
+					email.sender,
+					email.recipient,
+					email.cc ?? null,
+					email.bcc ?? null,
+					email.date,
+					email.body,
+					email.in_reply_to ?? null,
+					email.email_references ?? null,
+					email.thread_id ?? email.id,
+					email.raw_headers ?? null,
+					email.delivery_fingerprint ?? null,
+				);
+			}
+			if (attachments.length) this.db.insert(schema.attachments).values(attachments).run();
+			return { claimed: true, status: "pending", id: email.id };
+		});
+	}
 
- async markDeliveryUnknown(id: string) {
-  this.ctx.storage.transactionSync(() => {
-   this.db.update(schema.emails).set({ delivery_status: "unknown" }).where(and(eq(schema.emails.id, id), eq(schema.emails.delivery_status, "pending"))).run();
-   this.ctx.storage.sql.exec("UPDATE send_attempts SET status = 'unknown' WHERE id = ? AND status = 'pending'", id);
-  });
- }
+	async completeDelivery(id: string, messageId: string) {
+		this.ctx.storage.transactionSync(() => {
+			this.ctx.storage.sql.exec(
+				`UPDATE emails SET folder_id = ?, delivery_status = 'accepted', message_id = ?, thread_id = CASE WHEN thread_id = id THEN ? ELSE thread_id END, read = 1 WHERE id = ?`,
+				Folders.SENT,
+				messageId,
+				messageId,
+				id,
+			);
+			this.ctx.storage.sql.exec("UPDATE send_attempts SET status = 'accepted' WHERE id = ?", id);
+		});
+	}
+
+	async markDeliveryUnknown(id: string) {
+		this.ctx.storage.transactionSync(() => {
+			this.db
+				.update(schema.emails)
+				.set({ delivery_status: "unknown" })
+				.where(and(eq(schema.emails.id, id), eq(schema.emails.delivery_status, "pending")))
+				.run();
+			this.ctx.storage.sql.exec(
+				"UPDATE send_attempts SET status = 'unknown' WHERE id = ? AND status = 'pending'",
+				id,
+			);
+		});
+	}
 
 	// ── Email creation (Drizzle) ───────────────────────────────────
 
-	async createEmail(
-		folder: string,
-		email: EmailData,
-		attachments: AttachmentData[],
-	) {
+	async createEmail(folder: string, email: EmailData, attachments: AttachmentData[]) {
 		// Resolve folder name or ID to the actual folder ID.
 		const folderRow = this.db
 			.select({ id: schema.folders.id })
@@ -878,36 +1009,36 @@ export class MailboxDO extends DurableObject<Env> {
 		const isSent = folderId === Folders.SENT;
 
 		this.ctx.storage.transactionSync(() => {
-		// Sent emails are always read — the sender obviously knows what they wrote.
-		// This prevents sent replies from inflating thread_unread_count.
-		this.db
-			.insert(schema.emails)
-			.values({
-				id: email.id,
-				folder_id: folderId,
-				subject: email.subject,
-				sender: email.sender,
-				recipient: email.recipient,
-				cc: email.cc ?? null,
-				bcc: email.bcc ?? null,
-				date: email.date,
-				read: isSent ? 1 : (email.read ? 1 : 0),
-				starred: email.starred ? 1 : 0,
-				body: email.body,
-				in_reply_to: email.in_reply_to ?? null,
-				email_references: email.email_references ?? null,
-				thread_id: email.thread_id ?? null,
-				message_id: email.message_id ?? null,
-				raw_headers: email.raw_headers ?? null,
-				delivery_status: email.delivery_status ?? null,
-				delivery_fingerprint: email.delivery_fingerprint ?? null,
-			})
-			.onConflictDoNothing()
-			.run();
+			// Sent emails are always read — the sender obviously knows what they wrote.
+			// This prevents sent replies from inflating thread_unread_count.
+			this.db
+				.insert(schema.emails)
+				.values({
+					id: email.id,
+					folder_id: folderId,
+					subject: email.subject,
+					sender: email.sender,
+					recipient: email.recipient,
+					cc: email.cc ?? null,
+					bcc: email.bcc ?? null,
+					date: email.date,
+					read: isSent ? 1 : email.read ? 1 : 0,
+					starred: email.starred ? 1 : 0,
+					body: email.body,
+					in_reply_to: email.in_reply_to ?? null,
+					email_references: email.email_references ?? null,
+					thread_id: email.thread_id ?? null,
+					message_id: email.message_id ?? null,
+					raw_headers: email.raw_headers ?? null,
+					delivery_status: email.delivery_status ?? null,
+					delivery_fingerprint: email.delivery_fingerprint ?? null,
+				})
+				.onConflictDoNothing()
+				.run();
 
-		if (attachments.length > 0) {
-			this.db.insert(schema.attachments).values(attachments).onConflictDoNothing().run();
-		}
+			if (attachments.length > 0) {
+				this.db.insert(schema.attachments).values(attachments).onConflictDoNothing().run();
+			}
 		});
 	}
 }

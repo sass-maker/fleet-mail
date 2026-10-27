@@ -1,12 +1,8 @@
 // Copyright (c) 2026 Cloudflare, Inc.
-// Licensed under the Apache 2.0 license found in the LICENSE file or at:
-//     https://opensource.org/licenses/Apache-2.0
+// Licensed under Apache-2.0. Modified for Domain Inbox, 2026-10-27.
 
-/**
- * Shared attachment storage logic.
- * Eliminates the triplicated atob → Uint8Array → R2.put pattern.
- */
 import type { Env } from "../types";
+import type { SendEmailParams } from "../email-sender";
 
 export interface StoredAttachment {
 	id: string;
@@ -18,40 +14,32 @@ export interface StoredAttachment {
 	disposition: string;
 }
 
-/**
- * Store base64-encoded attachments to R2 and return metadata for the DO.
- */
-export async function storeAttachments(
-	bucket: Env["BUCKET"],
-	emailId: string,
-	attachments?: {
-		content: string;
-		filename: string;
-		type: string;
-		disposition: string;
-		contentId?: string;
-	}[],
-): Promise<StoredAttachment[]> {
-	if (!attachments?.length) return [];
-
-	const results: StoredAttachment[] = [];
-	for (const att of attachments) {
-		const attachmentId = crypto.randomUUID();
-		// Sanitize filename to prevent path traversal in R2 keys
-		const safeFilename = (att.filename || "untitled").replace(/[\/\\:*?"<>|\x00-\x1f]/g, "_");
-		const key = `attachments/${emailId}/${attachmentId}/${safeFilename}`;
-		const binaryStr = atob(att.content);
-		const bytes = Uint8Array.from(binaryStr, (c) => c.charCodeAt(0));
-		await bucket.put(key, bytes);
-		results.push({
-			id: attachmentId,
+export function prepareAttachments(emailId: string, attachments?: SendEmailParams["attachments"]) {
+	return (attachments || []).map((attachment, index) => {
+		const content = Uint8Array.from(atob(attachment.content), (character) =>
+			character.charCodeAt(0),
+		);
+		const metadata: StoredAttachment = {
+			id: `${emailId}-${index}`,
 			email_id: emailId,
-			filename: safeFilename,
-			mimetype: att.type,
-			size: bytes.byteLength,
-			content_id: att.contentId || null,
-			disposition: att.disposition,
-		});
+			filename: (attachment.filename || "untitled").replace(/[\/\\:*?"<>|\x00-\x1f]/g, "_"),
+			mimetype: attachment.type,
+			size: content.byteLength,
+			content_id: attachment.contentId || null,
+			disposition: attachment.disposition,
+		};
+		return { metadata, content };
+	});
+}
+
+export async function storePreparedAttachments(
+	bucket: Env["BUCKET"],
+	attachments: ReturnType<typeof prepareAttachments>,
+) {
+	for (const { metadata, content } of attachments) {
+		await bucket.put(
+			`attachments/${metadata.email_id}/${metadata.id}/${metadata.filename}`,
+			content,
+		);
 	}
-	return results;
 }

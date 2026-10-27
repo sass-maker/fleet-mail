@@ -53,10 +53,7 @@ export interface AttachmentInfo {
 
 // ── Zod Schemas ────────────────────────────────────────────────────
 
-const RecipientFieldSchema = z.union([
-	z.string().email(),
-	z.array(z.string().email()).min(1),
-]);
+const RecipientFieldSchema = z.union([z.string().email(), z.array(z.string().email()).min(1)]);
 
 export const ErrorResponseSchema = z.object({
 	error: z.string(),
@@ -68,10 +65,7 @@ export const SendEmailRequestSchema = z
 		to: RecipientFieldSchema,
 		cc: RecipientFieldSchema.optional(),
 		bcc: RecipientFieldSchema.optional(),
-		from: z.union([
-			z.string().email(),
-			z.object({ email: z.string().email(), name: z.string() }),
-		]),
+		from: z.union([z.string().email(), z.object({ email: z.string().email(), name: z.string() })]),
 		subject: z.string(),
 		html: z.string().optional(),
 		text: z.string().optional(),

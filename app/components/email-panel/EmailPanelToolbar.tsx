@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -68,7 +69,7 @@ export default function EmailPanelToolbar({
 				icon={<ArrowLeftIcon size={18} />}
 				onClick={onBack}
 				aria-label="Back to list"
-				className="md:hidden shrink-0"
+				className="xl:hidden shrink-0"
 			/>
 
 			{isDraftFolder ? (
@@ -195,7 +196,13 @@ export default function EmailPanelToolbar({
 	);
 }
 
-function MoveToFolderMenu({ folders, onMove }: { folders: Folder[]; onMove: (id: string) => void }) {
+function MoveToFolderMenu({
+	folders,
+	onMove,
+}: {
+	folders: Folder[];
+	onMove: (id: string) => void;
+}) {
 	const [open, setOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
 
@@ -229,7 +236,10 @@ function MoveToFolderMenu({ folders, onMove }: { folders: Folder[]; onMove: (id:
 							key={f.id}
 							type="button"
 							className="w-full text-left px-3 py-1.5 text-sm text-kumo-default hover:bg-kumo-overlay transition-colors"
-							onClick={() => { onMove(f.id); setOpen(false); }}
+							onClick={() => {
+								onMove(f.id);
+								setOpen(false);
+							}}
 						>
 							{f.name}
 						</button>

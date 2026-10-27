@@ -1,15 +1,9 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import {
-	Button,
-	Empty,
-	LinkProvider,
-	Loader,
-	Toasty,
-	TooltipProvider,
-} from "@cloudflare/kumo";
+import { Button, Empty, LinkProvider, Loader, Toasty, TooltipProvider } from "@cloudflare/kumo";
 import { WarningIcon } from "@phosphor-icons/react";
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { forwardRef, useState } from "react";
@@ -68,9 +62,7 @@ const KumoLink = forwardRef<
 	React.AnchorHTMLAttributes<HTMLAnchorElement> & { href?: string }
 >(function KumoLink({ href, ...props }, ref) {
 	if (href && !href.startsWith("http")) {
-		return (
-			<RouterLink to={href} ref={ref} {...(props as Record<string, unknown>)} />
-		);
+		return <RouterLink to={href} ref={ref} {...(props as Record<string, unknown>)} />;
 	}
 	return <a href={href} ref={ref} {...props} />;
 });
@@ -81,14 +73,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 			<head>
 				<meta charSet="UTF-8" />
 				<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-				<link
-					rel="icon"
-					type="image/x-icon"
-					href="/favicon.ico"
-					sizes="48x48 32x32 16x16"
-				/>
+				<link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="48x48 32x32 16x16" />
 				<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-				<title>Agentic Inbox</title>
+				<title>Domain Inbox</title>
 				<Meta />
 				<Links />
 			</head>
@@ -135,8 +122,7 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 		status = error.status;
 		if (error.status === 404) {
 			title = "Page not found";
-			description =
-				"The page you're looking for doesn't exist or has been moved.";
+			description = "The page you're looking for doesn't exist or has been moved.";
 		} else {
 			title = `Error ${error.status}`;
 			description = error.statusText || description;

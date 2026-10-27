@@ -7,13 +7,23 @@ import { useQuery } from "@tanstack/react-query";
 import api from "~/services/api";
 import { queryKeys } from "~/queries/keys";
 import { Button, Input, Tooltip } from "@cloudflare/kumo";
-import { GearSixIcon, ListIcon, MagnifyingGlassIcon, RobotIcon, XIcon } from "@phosphor-icons/react";
+import {
+	GearSixIcon,
+	ListIcon,
+	MagnifyingGlassIcon,
+	RobotIcon,
+	XIcon,
+} from "@phosphor-icons/react";
 import { type KeyboardEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { useUIStore } from "~/hooks/useUIStore";
 
 export default function Header() {
-	const { data: config } = useQuery({ queryKey: queryKeys.config, queryFn: () => api.getConfig(), staleTime: Infinity });
+	const { data: config } = useQuery({
+		queryKey: queryKeys.config,
+		queryFn: () => api.getConfig(),
+		staleTime: Infinity,
+	});
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 	const { mailboxId } = useParams<{ mailboxId: string }>();
@@ -70,7 +80,7 @@ export default function Header() {
 				icon={<ListIcon size={20} />}
 				onClick={toggleSidebar}
 				aria-label="Toggle sidebar"
-				className="md:hidden shrink-0"
+				className="xl:hidden shrink-0"
 			/>
 
 			{/* Search - full on desktop, collapsible on mobile */}
@@ -124,16 +134,22 @@ export default function Header() {
 			)}
 
 			<div className="flex items-center gap-1 ml-auto shrink-0">
-				{config?.aiEnabled && <Tooltip content={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"} side="bottom" asChild>
-					<Button
-						variant={isAgentPanelOpen ? "secondary" : "ghost"}
-						shape="square"
-						icon={<RobotIcon size={20} />}
-						onClick={toggleAgentPanel}
-						aria-label="Toggle agent panel"
-						className="hidden lg:inline-flex"
-					/>
-				</Tooltip>}
+				{config?.aiEnabled && (
+					<Tooltip
+						content={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"}
+						side="bottom"
+						asChild
+					>
+						<Button
+							variant={isAgentPanelOpen ? "secondary" : "ghost"}
+							shape="square"
+							icon={<RobotIcon size={20} />}
+							onClick={toggleAgentPanel}
+							aria-label="Toggle agent panel"
+							className="hidden 2xl:inline-flex"
+						/>
+					</Tooltip>
+				)}
 				<Tooltip content="Settings" side="bottom" asChild>
 					<Button
 						variant={isSettingsActive ? "secondary" : "ghost"}

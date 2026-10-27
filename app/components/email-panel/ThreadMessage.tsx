@@ -14,12 +14,7 @@ import {
 } from "@phosphor-icons/react";
 import EmailAttachmentList from "~/components/EmailAttachmentList";
 import EmailIframe from "~/components/EmailIframe";
-import {
-	formatDetailDate,
-	formatShortDate,
-	rewriteInlineImages,
-	stripHtml,
-} from "~/lib/utils";
+import { formatDetailDate, formatShortDate, rewriteInlineImages, stripHtml } from "~/lib/utils";
 import type { Email } from "~/types";
 
 interface ThreadMessageProps {
@@ -38,7 +33,15 @@ interface ThreadMessageProps {
 	onPreviewImage?: (url: string, filename: string) => void;
 }
 
-function Avatar({ isDraft, isSelf, sender }: { isDraft?: boolean; isSelf: boolean; sender: string }) {
+function Avatar({
+	isDraft,
+	isSelf,
+	sender,
+}: {
+	isDraft?: boolean;
+	isSelf: boolean;
+	sender: string;
+}) {
 	return (
 		<div
 			className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
@@ -84,9 +87,7 @@ export default function ThreadMessage({
 					<Avatar isDraft={isDraft} isSelf={isSelf} sender={email.sender} />
 					<div className="flex-1 min-w-0">
 						<div className="flex items-center justify-between">
-							<span className="text-sm font-medium text-kumo-default truncate">
-								{senderLabel}
-							</span>
+							<span className="text-sm font-medium text-kumo-default truncate">{senderLabel}</span>
 							<span className="text-xs text-kumo-subtle shrink-0">
 								{formatDetailDate(email.date)}
 							</span>
@@ -127,9 +128,7 @@ export default function ThreadMessage({
 						</div>
 					</div>
 					<div className="flex items-center gap-1 shrink-0">
-						<span className="text-xs text-kumo-subtle">
-							{formatShortDate(email.date)}
-						</span>
+						<span className="text-xs text-kumo-subtle">{formatShortDate(email.date)}</span>
 						{onViewSource && (
 							<Tooltip content="View source" side="bottom" asChild>
 								<Button
@@ -157,8 +156,19 @@ export default function ThreadMessage({
 					</div>
 				</div>
 
-				{email.delivery_status && <p role="status" className="mb-3 rounded-md bg-kumo-fill px-3 py-2 text-sm text-kumo-default">{email.delivery_status === "accepted" ? "Accepted by the sending provider. This does not confirm recipient delivery." : email.delivery_status === "pending" ? "Send started. The outcome has not been confirmed. Check before sending again." : "Sending was not confirmed. This copy is retained for recovery. Check before sending again."}</p>}
-    <div className="md:ml-[42px]">
+				{email.delivery_status && (
+					<p
+						role="status"
+						className="mb-3 rounded-md bg-kumo-fill px-3 py-2 text-sm text-kumo-default"
+					>
+						{email.delivery_status === "accepted"
+							? "Accepted by the sending provider. This does not confirm recipient delivery."
+							: email.delivery_status === "pending"
+								? "Send started. The outcome has not been confirmed. Check before sending again."
+								: "Sending was not confirmed. This copy is retained for recovery. Check before sending again."}
+					</p>
+				)}
+				<div className="md:ml-[42px]">
 					<EmailIframe
 						body={rewriteInlineImages(
 							email.body || "",
@@ -201,7 +211,7 @@ export default function ThreadMessage({
 								size="sm"
 								icon={<TrashIcon size={14} />}
 								onClick={onDeleteDraft}
-								disabled={isSending || !!email.delivery_status}
+								disabled={isSending}
 							>
 								Discard
 							</Button>

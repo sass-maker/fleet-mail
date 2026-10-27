@@ -19,10 +19,7 @@ export class ApiError extends Error {
 	}
 }
 
-async function request<T>(
-	url: string,
-	options: RequestInit = {},
-): Promise<T> {
+async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -58,7 +55,10 @@ async function request<T>(
 	}
 }
 
-function get<T>(url: string, opts?: { params?: Record<string, string>; responseType?: string; signal?: AbortSignal }) {
+function get<T>(
+	url: string,
+	opts?: { params?: Record<string, string>; responseType?: string; signal?: AbortSignal },
+) {
 	const query = opts?.params ? `?${new URLSearchParams(opts.params)}` : "";
 	return request<T>(`${url}${query}`, {
 		method: "GET",
@@ -112,24 +112,50 @@ const api = {
 		del<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}`),
 
 	// Emails
-	listEmails: (mailboxId: string, params: Record<string, string>, opts?: { signal?: AbortSignal }) =>
-		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails`, { params, signal: opts?.signal }),
+	listEmails: (
+		mailboxId: string,
+		params: Record<string, string>,
+		opts?: { signal?: AbortSignal },
+	) =>
+		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails`, {
+			params,
+			signal: opts?.signal,
+		}),
 	sendEmail: (mailboxId: string, email: unknown) =>
 		post<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails`, email),
 	getEmail: (mailboxId: string, id: string, opts?: { signal?: AbortSignal }) =>
-		get<Email>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${id}`, { signal: opts?.signal }),
+		get<Email>(
+			`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${encodeURIComponent(id)}`,
+			{ signal: opts?.signal },
+		),
 	updateEmail: (mailboxId: string, id: string, data: unknown) =>
-		put<Email>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${id}`, data),
+		put<Email>(
+			`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${encodeURIComponent(id)}`,
+			data,
+		),
 	deleteEmail: (mailboxId: string, id: string) =>
-		del<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${id}`),
+		del<void>(
+			`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${encodeURIComponent(id)}`,
+		),
 	moveEmail: (mailboxId: string, id: string, folderId: string) =>
-		post<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${id}/move`, { folderId }),
+		post<void>(
+			`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${encodeURIComponent(id)}/move`,
+			{ folderId },
+		),
 	getThread: (mailboxId: string, threadId: string, opts?: { signal?: AbortSignal }) =>
-		get<Email[]>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/threads/${threadId}`, { signal: opts?.signal }),
+		get<Email[]>(
+			`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/threads/${encodeURIComponent(threadId)}`,
+			{ signal: opts?.signal },
+		),
 	markThreadRead: (mailboxId: string, threadId: string) =>
-		post<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/threads/${threadId}/read`),
+		post<void>(
+			`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/threads/${encodeURIComponent(threadId)}/read`,
+		),
 	getAttachment: (mailboxId: string, emailId: string, attachmentId: string) =>
-		get<Blob>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${emailId}/attachments/${attachmentId}`, { responseType: "blob" }),
+		get<Blob>(
+			`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${encodeURIComponent(emailId)}/attachments/${encodeURIComponent(attachmentId)}`,
+			{ responseType: "blob" },
+		),
 	saveDraft: (
 		mailboxId: string,
 		draft: {
@@ -142,11 +168,17 @@ const api = {
 			thread_id?: string;
 			draft_id?: string;
 		},
-	) => post<{ draft_id: string }>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/drafts`, draft),
+	) => post<{ id: string }>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/drafts`, draft),
 	replyToEmail: (mailboxId: string, emailId: string, email: unknown) =>
-		post<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${emailId}/reply`, email),
+		post<void>(
+			`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${encodeURIComponent(emailId)}/reply`,
+			email,
+		),
 	forwardEmail: (mailboxId: string, emailId: string, email: unknown) =>
-		post<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${emailId}/forward`, email),
+		post<void>(
+			`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${encodeURIComponent(emailId)}/forward`,
+			email,
+		),
 
 	// Folders
 	listFolders: (mailboxId: string) =>
@@ -154,13 +186,20 @@ const api = {
 	createFolder: (mailboxId: string, name: string) =>
 		post<Folder>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/folders`, { name }),
 	updateFolder: (mailboxId: string, id: string, name: string) =>
-		put<Folder>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/folders/${id}`, { name }),
+		put<Folder>(
+			`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/folders/${encodeURIComponent(id)}`,
+			{ name },
+		),
 	deleteFolder: (mailboxId: string, id: string) =>
-		del<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/folders/${id}`),
+		del<void>(
+			`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/folders/${encodeURIComponent(id)}`,
+		),
 
 	// Search
 	searchEmails: (mailboxId: string, params: Record<string, string>) =>
-		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/search`, { params }),
+		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/search`, {
+			params,
+		}),
 };
 
 export default api;

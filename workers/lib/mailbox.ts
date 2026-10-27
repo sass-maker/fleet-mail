@@ -37,6 +37,6 @@ export const requireMailbox = createMiddleware<MailboxContext>(async (c, next) =
 	const stub = ns.get(id);
 
 	c.set("mailboxStub", stub);
-	
+
 	await next();
 });

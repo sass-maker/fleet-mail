@@ -33,7 +33,7 @@ The root agent records final test, typecheck, build, browser and independent-rev
 Local preparation only as of 2026-10-27. No production deployment, routing/DNS change or live mailbox migration was performed by this implementation.
 No 11-domain live receive/reply acceptance is claimed. Domain enrollment, sending access, owner-only Access policy, storage/recovery and provider limits require qualification before cutover.
 An ambiguous provider outcome deliberately requires checking before a new send. Provider acceptance does not establish delivery to the recipient.
-Inherited upstream dependency vulnerabilities require release review; package upgrades are owned by the root agent.
+Inherited upstream dependency vulnerabilities require release review; package upgrades are deferred to a separate release review.
 
 ## 6. Next action
 

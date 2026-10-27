@@ -27,12 +27,7 @@ export function applyMigrations(
 	)`);
 
 	for (const migration of migrations) {
-		const applied = [
-			...sql.exec(
-				`SELECT 1 FROM d1_migrations WHERE name = ?`,
-				migration.name,
-			),
-		];
+		const applied = [...sql.exec(`SELECT 1 FROM d1_migrations WHERE name = ?`, migration.name)];
 		if (applied.length > 0) continue;
 
 		// Strip any existing BEGIN/COMMIT wrapper from the migration SQL.
@@ -45,9 +40,7 @@ export function applyMigrations(
 		const escapedName = migration.name.replace(/'/g, "''");
 		const run = () => {
 			sql.exec(migrationSql);
-			sql.exec(
-				`INSERT INTO d1_migrations (name) VALUES ('${escapedName}')`,
-			);
+			sql.exec(`INSERT INTO d1_migrations (name) VALUES ('${escapedName}')`);
 		};
 
 		if (storage) {
@@ -169,5 +162,8 @@ export const mailboxMigrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_emails_folder_date ON emails(folder_id, date DESC);
         `,
 	},
-	{ name: "9_add_delivery_status", sql: `ALTER TABLE emails ADD COLUMN delivery_status TEXT; ALTER TABLE emails ADD COLUMN delivery_fingerprint TEXT; CREATE TABLE send_attempts (id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL);` },
+	{
+		name: "9_add_delivery_status",
+		sql: `ALTER TABLE emails ADD COLUMN delivery_status TEXT; ALTER TABLE emails ADD COLUMN delivery_fingerprint TEXT; CREATE TABLE send_attempts (id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL);`,
+	},
 ];

@@ -18,9 +18,7 @@ export function useMailboxes() {
 
 export function useMailbox(mailboxId: string | undefined) {
 	return useQuery<Mailbox>({
-		queryKey: mailboxId
-			? queryKeys.mailboxes.detail(mailboxId)
-			: ["mailboxes", "_disabled"],
+		queryKey: mailboxId ? queryKeys.mailboxes.detail(mailboxId) : ["mailboxes", "_disabled"],
 		queryFn: () => api.getMailbox(mailboxId!) as Promise<Mailbox>,
 		enabled: !!mailboxId,
 	});
@@ -40,10 +38,7 @@ export function useCreateMailbox() {
 export function useUpdateMailbox() {
 	const qc = useQueryClient();
 	return useMutation({
-		mutationFn: ({
-			mailboxId,
-			settings,
-		}: { mailboxId: string; settings: unknown }) =>
+		mutationFn: ({ mailboxId, settings }: { mailboxId: string; settings: unknown }) =>
 			api.updateMailbox(mailboxId, settings),
 		onSuccess: (_data, { mailboxId }) => {
 			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.detail(mailboxId) });

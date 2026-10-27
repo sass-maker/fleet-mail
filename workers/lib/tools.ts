@@ -34,10 +34,7 @@ import type { Env } from "../types";
 
 // ── Type casts for DO methods not on the base stub type ────────────
 type MailboxSearchStub = {
-	searchEmails: (options: {
-		query: string;
-		folder?: string;
-	}) => Promise<unknown>;
+	searchEmails: (options: { query: string; folder?: string }) => Promise<unknown>;
 };
 
 type RateLimitStub = {
@@ -69,11 +66,7 @@ export async function toolListEmails(
 
 // ── get_email ──────────────────────────────────────────────────────
 
-export async function toolGetEmail(
-	env: Env,
-	mailboxId: string,
-	emailId: string,
-) {
+export async function toolGetEmail(env: Env, mailboxId: string, emailId: string) {
 	const stub = getMailboxStub(env, mailboxId);
 	const email = await getFullEmail(stub, emailId);
 	if (!email) return { error: "Email not found" };
@@ -82,11 +75,7 @@ export async function toolGetEmail(
 
 // ── get_thread ─────────────────────────────────────────────────────
 
-export async function toolGetThread(
-	env: Env,
-	mailboxId: string,
-	threadId: string,
-) {
+export async function toolGetThread(env: Env, mailboxId: string, threadId: string) {
 	const stub = getMailboxStub(env, mailboxId);
 	return getFullThread(stub, threadId);
 }
@@ -211,7 +200,13 @@ export async function toolDraftEmail(
 		thread_id?: string;
 	},
 ): Promise<
-	| { status: string; draftId: string; threadId?: string; message: string; draft?: Record<string, string> }
+	| {
+			status: string;
+			draftId: string;
+			threadId?: string;
+			message: string;
+			draft?: Record<string, string>;
+	  }
 	| { error: string }
 > {
 	const stub = getMailboxStub(env, mailboxId);
@@ -282,8 +277,7 @@ export async function toolUpdateDraft(
 		bodyHtml?: string;
 	},
 ): Promise<
-	| { status: string; newDraftId: string; oldDraftId: string; message: string }
-	| { error: string }
+	{ status: string; newDraftId: string; oldDraftId: string; message: string } | { error: string }
 > {
 	const stub = getMailboxStub(env, mailboxId);
 
@@ -298,7 +292,9 @@ export async function toolUpdateDraft(
 	const verifiedBody = await verifyDraft(env.AI, rawBody);
 
 	if (!verifiedBody) {
-		return { error: "Draft verification failed — keeping existing draft unchanged. Please try again." };
+		return {
+			error: "Draft verification failed — keeping existing draft unchanged. Please try again.",
+		};
 	}
 
 	await stub.deleteEmail(params.draftId);
@@ -357,11 +353,7 @@ export async function toolMoveEmail(
 
 // ── discard_draft ──────────────────────────────────────────────────
 
-export async function toolDiscardDraft(
-	env: Env,
-	mailboxId: string,
-	draftId: string,
-) {
+export async function toolDiscardDraft(env: Env, mailboxId: string, draftId: string) {
 	const stub = getMailboxStub(env, mailboxId);
 	const email = (await stub.getEmail(draftId)) as { folder_id?: string } | null;
 	if (!email) {
@@ -376,11 +368,7 @@ export async function toolDiscardDraft(
 
 // ── delete_email ───────────────────────────────────────────────────
 
-export async function toolDeleteEmail(
-	env: Env,
-	mailboxId: string,
-	emailId: string,
-) {
+export async function toolDeleteEmail(env: Env, mailboxId: string, emailId: string) {
 	const stub = getMailboxStub(env, mailboxId);
 	const result = await stub.deleteEmail(emailId);
 	if (result === null) {
@@ -391,20 +379,60 @@ export async function toolDeleteEmail(
 
 // ── send_reply ─────────────────────────────────────────────────────
 
-export async function toolSendReply(env: Env, mailboxId: string, params: { originalEmailId: string; to: string; subject: string; bodyHtml: string }) {
- const stub = getMailboxStub(env, mailboxId);
- const original = await stub.getEmail(params.originalEmailId) as EmailFull | null;
- if (!original) return { error: "Original email not found" };
- const chain = buildReferencesChain(original);
- try {
-  const result = await sendOutgoing(env, mailboxId, { to: params.to, from: mailboxId, subject: params.subject, html: params.bodyHtml, in_reply_to: chain.originalMsgId, references: chain.references, thread_id: chain.threadId });
-  return { ...result, messageId: result.id, message: "Reply accepted by the sending provider" };
- } catch (error) { return { error: `Failed to send reply: ${(error as Error).message}` }; }
+export async function toolSendReply(
+	env: Env,
+	mailboxId: string,
+	params: { originalEmailId: string; to: string; subject: string; bodyHtml: string },
+) {
+	if (env.AI_ENABLED !== "true") return { error: "AI sending tools are disabled" };
+	const stub = getMailboxStub(env, mailboxId);
+	const original = (await stub.getEmail(params.originalEmailId)) as EmailFull | null;
+	if (!original) return { error: "Original email not found" };
+	const chain = buildReferencesChain(original);
+	const sanitized = await verifyDraft(env.AI, params.bodyHtml);
+	if (!sanitized)
+		return { error: "Draft verification failed; refusing to send unverified content" };
+	const html =
+		sanitized +
+		buildQuotedReplyBlock({
+			date: original.date,
+			sender: original.sender,
+			body: original.body || undefined,
+		});
+	try {
+		const result = await sendOutgoing(env, mailboxId, {
+			to: params.to,
+			from: mailboxId,
+			subject: params.subject,
+			html,
+			in_reply_to: chain.originalMsgId,
+			references: chain.references,
+			thread_id: chain.threadId,
+		});
+		return { ...result, messageId: result.id, message: "Reply accepted by the sending provider" };
+	} catch (error) {
+		return { error: `Failed to send reply: ${(error as Error).message}` };
+	}
 }
 
-export async function toolSendEmail(env: Env, mailboxId: string, params: { to: string; subject: string; bodyHtml: string }) {
- try {
-  const result = await sendOutgoing(env, mailboxId, { to: params.to, from: mailboxId, subject: params.subject, html: params.bodyHtml });
-  return { ...result, messageId: result.id, message: "Email accepted by the sending provider" };
- } catch (error) { return { error: `Failed to send email: ${(error as Error).message}` }; }
+export async function toolSendEmail(
+	env: Env,
+	mailboxId: string,
+	params: { to: string; subject: string; bodyHtml: string },
+) {
+	if (env.AI_ENABLED !== "true") return { error: "AI sending tools are disabled" };
+	const sanitized = await verifyDraft(env.AI, params.bodyHtml);
+	if (!sanitized)
+		return { error: "Draft verification failed; refusing to send unverified content" };
+	try {
+		const result = await sendOutgoing(env, mailboxId, {
+			to: params.to,
+			from: mailboxId,
+			subject: params.subject,
+			html: sanitized,
+		});
+		return { ...result, messageId: result.id, message: "Email accepted by the sending provider" };
+	} catch (error) {
+		return { error: `Failed to send email: ${(error as Error).message}` };
+	}
 }
