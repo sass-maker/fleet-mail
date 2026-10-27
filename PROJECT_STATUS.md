@@ -39,5 +39,5 @@ Inherited upstream dependency vulnerabilities require release review; package up
 
 ## 6. Next action
 
-Qualify stock https://github.com/DivinPrince/quickinbox against the combined-inbox and catch-all reply workflow. Keep this prototype unmerged and undeployed; the final review still has in-flight deletion, recovery and draft-threading findings.22 native tests, typecheck and build passed, but final browser verification became unavailable.
+Qualify stock https://github.com/DivinPrince/quickinbox against the combined-inbox and catch-all reply workflow. Keep this prototype unmerged and undeployed; the final review still has in-flight deletion, recovery and draft-threading findings. 22 native tests, typecheck and build passed, but final browser verification became unavailable.
 Keep current forwarding until the new receive/read/reply workflow is proven and the owner authorizes cutover.
