@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { logoutAccount } from '$lib/account-switch';
 	import { t } from '$lib/i18n';
+	import { domainFilterHref } from '$lib/domain-filter';
 	import type { ThemeShellProps } from '$lib/ui-theme/types';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import AccountHeader from './AccountHeader.svelte';
@@ -20,6 +21,13 @@
 	let paletteOpen = $state(false);
 	let shortcutsOpen = $state(false);
 	let chord = $state('');
+
+	// Retire old address-filter bookmarks along with the address selector.
+	$effect(() => {
+		if ($page.url.searchParams.has('address')) {
+			void goto(domainFilterHref($page.url), { replaceState: true, noScroll: true });
+		}
+	});
 
 	const pathname = $derived($page.url.pathname);
 	const settings = $derived(pathname.startsWith('/settings') || pathname.startsWith('/admin'));

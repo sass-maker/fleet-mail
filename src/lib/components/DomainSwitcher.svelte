@@ -7,12 +7,14 @@
 	let {
 		domains,
 		activeDomainId,
-		block = false
+		block = false,
+		alignEnd = false
 	}: {
 		domains: Domain[];
 		activeDomainId: string | null;
 		/** Stretch to the container width — used inside the sidebar. */
 		block?: boolean;
+		alignEnd?: boolean;
 	} = $props();
 
 	let open = $state(false);
@@ -71,7 +73,7 @@
 				aria-label={t('domains.closeMenu')}
 				onclick={() => (open = false)}
 			></button>
-			<ul class="switcher-menu" role="listbox">
+			<ul class="switcher-menu" class:end={alignEnd} role="listbox">
 				<li>
 					<button
 						type="button"
@@ -106,14 +108,25 @@
 				{/each}
 			</ul>
 		{/if}
+		{#if error}<p class="switcher-error" role="alert">{error}</p>{/if}
 	</div>
 {:else if domains.length === 1}
 	<span class="single-domain" title={domains[0].name}>{domains[0].name}</span>
 {/if}
 
-{#if error}<p role="alert">{error}</p>{/if}
-
 <style>
+	.switcher-error {
+		max-width: 16rem;
+		margin: 0.25rem 0 0;
+		font-size: 0.75rem;
+		color: var(--color-danger, #dc2626);
+	}
+
+	.switcher-menu.end {
+		left: auto;
+		right: 0;
+	}
+
 	.switcher {
 		position: relative;
 	}

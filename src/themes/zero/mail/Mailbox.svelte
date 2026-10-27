@@ -320,7 +320,7 @@
 				{t('nav.starred')}
 			</button>
 			<div class="z-domain-filter">
-				<DomainSwitcher domains={$page.data.domains ?? []} activeDomainId={$page.data.activeDomainId ?? null} />
+				<DomainSwitcher domains={$page.data.domains ?? []} activeDomainId={$page.data.activeDomainId ?? null} alignEnd />
 			</div>
 		</div>
 
