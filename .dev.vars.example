@@ -1,3 +1,53 @@
-# Cloudflare Access (required in production). TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
-POLICY_AUD=your-access-policy-audience-tag
-TEAM_DOMAIN=https://your-team.cloudflareaccess.com
+# Copy this file to .dev.vars and fill in real values.
+# .dev.vars is gitignored — never commit it.
+#
+# In production these live as Worker secrets / vars instead.
+
+# resend (default) or cloudflare. Set in wrangler.jsonc vars for production;
+# uncomment here only to override locally.
+# EMAIL_PROVIDER=resend
+
+# --- Resend (EMAIL_PROVIDER=resend) ---
+# From https://resend.com/api-keys — needs full access (send + domains + receiving).
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Shown once when you create the webhook at https://resend.com/webhooks
+# (see the README). Starts with whsec_.
+RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# --- Cloudflare Email (EMAIL_PROVIDER=cloudflare) ---
+# Comma-separated domains already onboarded in Email Service / Email Routing.
+# CLOUDFLARE_MAIL_DOMAINS=example.com,mail.example.com
+
+# --- Telegram notifications (optional) ---
+# Ping a Telegram chat on every inbound message. Both values are required —
+# leave either blank and notifications stay off. Works with both providers.
+# Token from @BotFather; chat id from @userinfobot (negative for groups).
+# Production values should be added with `wrangler secret put`, not committed.
+# TELEGRAM_BOT_TOKEN=123456789:AA...
+# TELEGRAM_CHAT_ID=987654321
+# Forum supergroups only: the topic to post into. Without it Telegram puts the
+# message in General. Open the topic and read the last number in its link.
+# TELEGRAM_THREAD_ID=3
+# Public URL of this install, linked from each notification.
+# APP_URL=https://mail.example.com
+
+# --- Desktop notifications (optional) ---
+# Generate once with: bunx web-push generate-vapid-keys
+# Production values should be added with `wrangler secret put`, not committed.
+# VAPID_PUBLIC_KEY=REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY
+# VAPID_PRIVATE_KEY=REPLACE_WITH_YOUR_VAPID_PRIVATE_KEY
+# VAPID_SUBJECT=mailto:admin@example.com
+
+# --- Inbox tabs (optional) ---
+# TypeSafe classifies inbound mail into Primary, Social, Promotions, Updates,
+# Forums, and spam. Keep the placeholder to skip — everything stays in Primary.
+# Production: wrangler secret put TYPESAFE_API_KEY
+TYPESAFE_API_KEY=REPLACE_WITH_YOUR_TYPESAFE_API_KEY
+
+# --- AI drafting ---
+# Encrypts the AI provider keys people save in Settings. 32+ random characters,
+# e.g. `openssl rand -base64 32`. `bun run setup` generates one. Set it once and
+# keep it: changing it makes every saved key unreadable.
+# Production: wrangler secret put ENCRYPTION_KEY
+ENCRYPTION_KEY=REPLACE_WITH_32_OR_MORE_RANDOM_CHARACTERS
