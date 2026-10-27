@@ -1,19 +1,23 @@
 # Fleet Mail
 
 ## Purpose
-One private inbox for new catch-all mail across the owner's domains, with replies from the receiving address.
+One private inbox for new catch-all mail across the owner's 11 domains, with replies from the exact receiving address.
 
 ## Source
 Stock Quickinbox at `bae9da459b68aa6164ed4e5c84a452b7423c277a`, retaining its UI and MIT license. The previous Agentic Inbox prototype is preserved on its own branch and draft PR.
 
 ## Scope
-Cloudflare Workers, D1, R2 and Email Service. Single-owner Cloudflare Access email-code login. No historical personal-inbox import.
+Cloudflare Workers, D1, R2 and Email Service. Single-owner Cloudflare Access email-code login. New mail only; no historical personal-inbox import.
 
-## Verification
-Upstream baseline: 381 tests passed; typecheck passed with four upstream Svelte warnings. Deployment and changed authentication verification are in progress.
+## Verification — 2026-10-27
+381 upstream tests and 14 owner/provisioning tests passed. Typecheck before and after build passed with four existing upstream Svelte warnings. Production build, deployment dry-run and current-main CI passed. Independent CodeVetter review identified authentication, provisioning and packaging defects; confirmed findings were fixed and checked.
+
+Live verification passed: owner email-code sign-in, storage for all 11 domain inboxes, actual catch-all receipt at an unregistered address on every domain, recipient-address search, and a Reply-button message delivered to owner Gmail from the exact receiving address. Stock UI inspected at 390, 768 and 1440 pixel widths.
 
 ## Deployment
-Dedicated Worker `fleet-mail`, D1 `fleet-mail`, R2 `fleet-mail-attachments`. Mail routing must be qualified before cutover; no successful live mail claim yet.
+https://fleet-mail.sarthakagrawal927.workers.dev
 
-## Remaining
-Verify Access sign-in, provision all domains, qualify live receive/reply and retain rollback routing snapshots.
+Dedicated Worker `fleet-mail`, D1 `fleet-mail`, R2 `fleet-mail-attachments`. All 11 domain catch-all rules now invoke `fleet-mail`; they no longer forward directly to personal Gmail. The prior forwarding rules are retained in owner-local rollback snapshots. Domain sending is enabled for all 11 domains. Password/setup/pairing, API-token and MCP login paths stay closed; Access is the sole HTTP login.
+
+## Next
+Use the stock inbox, then evaluate owner-requested domain/address grouping refinements. No additional features or historical mail migration are included in this deployment.
