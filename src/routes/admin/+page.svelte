@@ -308,6 +308,7 @@
 		{#if domainError}<p class="error">{domainError}</p>{/if}
 	</section>
 
+	{#if !$page.data.ownerAccess}
 	<div class="admin-grid">
 		<section class="surface-lg admin-card">
 			<h2><Icon name="user-add-line" size={18} /> {t('admin.newUser')}</h2>
@@ -400,6 +401,8 @@
 			{#if deleteError}<p class="error">{deleteError}</p>{/if}
 		</section>
 	</div>
+
+	{/if}
 
 	<AiProviderSettings scope="instance" />
 

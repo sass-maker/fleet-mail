@@ -162,7 +162,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (db) {
 		// Browser sessions take precedence so an incidental or stale Authorization
 		// header cannot downgrade a legitimate cookie-authenticated API request.
-		const activeToken = accessOwner ? null : readSessionToken(event.cookies);
+		const activeToken = accessOwner ? undefined : readSessionToken(event.cookies);
 		let cookieSession: AuthenticatedSession | null = await getAuthenticatedSession(db, activeToken);
 
 		// Other accounts signed in on this browser. Only page loads need them (the

@@ -11,10 +11,11 @@
  *
  * Usage: node scripts/check-template-clean.mjs
  */
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('../', import.meta.url));
 const deployment = process.argv.includes('--deployment');
 
 // Anything matching these must never appear in a tracked file.
@@ -31,7 +32,7 @@ const FORBIDDEN = [
 ];
 
 // Files whose whole job is to show what a secret looks like.
-const SKIP_FILES = new Set(['scripts/check-template-clean.mjs', '.env.example', '.dev.vars.example']);
+const SKIP_FILES = new Set(['scripts/check-template-clean.mjs']);
 const SKIP_EXTENSIONS = /\.(png|jpe?g|gif|ico|woff2?|ttf|eot|pdf|zip|lock)$/i;
 
 // A hit that is obviously a placeholder rather than a real credential.
@@ -44,7 +45,7 @@ function fail(message) {
 	failures.push(message);
 }
 
-const tracked = execSync('git ls-files', { cwd: root, encoding: 'utf8' })
+const tracked = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
 	.split('\n')
 	.filter(Boolean);
 
@@ -68,7 +69,7 @@ for (const file of tracked) {
 		const match = contents.match(pattern);
 		if (match && !isPlaceholder(match[0])) {
 			const line = contents.slice(0, match.index).split('\n').length;
-			fail(`${label} in ${file}:${line} — matched ${JSON.stringify(match[0].slice(0, 40))}`);
+			fail(`${label} in ${file}:${line} — remove the credential before committing`);
 		}
 	}
 }

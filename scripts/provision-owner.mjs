@@ -13,12 +13,17 @@ export function provisioningSQL(email, domains) {
 		`INSERT OR IGNORE INTO users (id,email,name,password_hash,is_admin,must_change_password)
 		 SELECT 'fleet-owner',${quote(email)},'Sarthak','access-only',1,0 WHERE NOT EXISTS (SELECT 1 FROM users)`
 	];
-	for (const domain of domains) {
+	const ordered = domains.includes('sassmaker.com')
+		? ['sassmaker.com', ...domains.filter(domain => domain !== 'sassmaker.com')] : domains;
+	for (const domain of ordered) {
 		statements.push(`INSERT OR IGNORE INTO domains
 		 (id,name,status,sending_enabled,receiving_enabled,catchall_user_id,synced_at)
 		 SELECT ${quote(domain)},${quote(domain)},'verified',1,1,id,datetime('now') FROM users WHERE id IN (${owner})`);
+		statements.push(`UPDATE domains SET catchall_user_id = (${owner})
+		 WHERE name = ${quote(domain)} AND catchall_user_id IS NULL AND EXISTS (${owner})`);
 		statements.push(`INSERT OR IGNORE INTO addresses (id,user_id,domain_id,address,is_default)
-		 SELECT ${quote(`fleet-team-${domain}`)},u.id,d.id,${quote(`team@${domain}`)},${domain === 'sassmaker.com' ? 1 : 0}
+		 SELECT ${quote(`fleet-team-${domain}`)},u.id,d.id,${quote(`team@${domain}`)},
+		 CASE WHEN NOT EXISTS (SELECT 1 FROM addresses WHERE user_id = u.id AND is_default = 1) THEN 1 ELSE 0 END
 		 FROM users u JOIN domains d ON d.catchall_user_id = u.id
 		 WHERE u.id IN (${owner}) AND d.name = ${quote(domain)}`);
 	}

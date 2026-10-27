@@ -19,6 +19,11 @@ test('provisioning is repeatable against the real schema and preserves stored ma
 	assert.equal(db.prepare('SELECT COUNT(*) AS count FROM addresses').get().count, 2);
 	assert.equal(db.prepare('SELECT subject FROM emails WHERE id = ?').get('retained').subject, 'Retain this message');
 	assert.equal(db.prepare('SELECT password_hash FROM users').get().password_hash, 'access-only');
+	assert.equal(db.prepare('SELECT SUM(is_default) AS count FROM addresses').get().count, 1);
+	db.exec("INSERT INTO domains (id,name,status) VALUES ('existing.example','existing.example','verified')");
+	db.exec(provisioningSQL('owner@example.com', ['existing.example', 'sassmaker.com']));
+	assert.equal(db.prepare("SELECT catchall_user_id FROM domains WHERE id='existing.example'").get().catchall_user_id, 'fleet-owner');
+	assert.equal(db.prepare('SELECT SUM(is_default) AS count FROM addresses').get().count, 1);
 	db.exec(provisioningSQL('different@example.com', domains));
 	assert.equal(db.prepare('SELECT email FROM users').get().email, 'owner@example.com');
 	assert.equal(db.prepare('SELECT catchall_user_id FROM domains').get().catchall_user_id, 'fleet-owner');
