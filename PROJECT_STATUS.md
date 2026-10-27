@@ -1,4 +1,6 @@
-# Domain Inbox
+# Fleet Mail
+
+Owner direction, 2026-10-27: use an existing open-source application with minimal customization. This branch is a preserved Agentic Inbox prototype, not the selected production implementation. Quickinbox is the preferred adoption candidate after source inspection; its runtime and real-provider delivery are not yet qualified. Stop adding features to this prototype.
 
 ## 1. Purpose and scope
 
@@ -37,5 +39,5 @@ Inherited upstream dependency vulnerabilities require release review; package up
 
 ## 6. Next action
 
-Complete native checks, phone/tablet/desktop rendered verification and independent review, then qualify one owned domain before moving all 11.
+Qualify stock https://github.com/DivinPrince/quickinbox against the combined-inbox and catch-all reply workflow. Keep this prototype unmerged and undeployed; the final review still has in-flight deletion, recovery and draft-threading findings.22 native tests, typecheck and build passed, but final browser verification became unavailable.
 Keep current forwarding until the new receive/read/reply workflow is proven and the owner authorizes cutover.

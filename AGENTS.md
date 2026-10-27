@@ -1,6 +1,6 @@
-# Domain Inbox
+# Fleet Mail prototype
 
-Private single-user catch-all inbox adapted from Cloudflare Agentic Inbox.
+Preserved private prototype adapted from Cloudflare Agentic Inbox. The owner strongly prefers an existing open-source application. Do not continue this custom fork without a new owner instruction; qualify stock DivinPrince/quickinbox for Fleet Mail instead.
 
 - Preserve the Apache-2.0 license and upstream copyright notices. Mark modified upstream files.
 - Keep one mailbox per exact receiving address. Route using the SMTP envelope recipient, never MIME To/CC/BCC.

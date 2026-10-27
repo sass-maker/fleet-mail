@@ -1,3 +1,9 @@
+# Fleet Mail prototype
+
+This branch preserves an early Agentic Inbox adaptation. The owner clarified a strong preference for an existing application with a combined inbox and filters. [Quickinbox](https://github.com/DivinPrince/quickinbox) is the preferred adoption candidate after source inspection. It has not been runtime-qualified or deployed here.
+
+This prototype is unmerged and undeployed. Its22 native tests, typecheck and production build pass, but independent review still has open send/recovery findings and final browser verification is incomplete. Existing domain forwarding remains unchanged. The earlier prototype documentation follows for recovery only.
+
 # Domain Inbox
 
 A private catch-all inbox for your domains. Every receiving address appears automatically under its domain, and replies use that exact address.
