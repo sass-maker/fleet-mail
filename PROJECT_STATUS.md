@@ -15,7 +15,9 @@ Cloudflare Workers, D1, R2 and Email Service. Single-owner Cloudflare Access ema
 Live verification passed: owner email-code sign-in, storage for all 11 domain inboxes, actual catch-all receipt at an unregistered address on every domain, recipient-address search, and a Reply-button message delivered to owner Gmail from the exact receiving address. Stock UI inspected at 390, 768 and 1440 pixel widths.
 
 ## Deployment
-https://fleet-mail.sarthakagrawal927.workers.dev
+https://mail.significanthobbies.com
+
+Cloudflare Access protects this custom domain and the original Workers hostname with the same owner-only email-code policy. The custom domain changes the web entry point; all 11 catch-all rules continue to invoke the same `fleet-mail` Worker.
 
 Dedicated Worker `fleet-mail`, D1 `fleet-mail`, R2 `fleet-mail-attachments`. All 11 domain catch-all rules now invoke `fleet-mail`; they no longer forward directly to personal Gmail. The prior forwarding rules are retained in owner-local rollback snapshots. Domain sending is enabled for all 11 domains. Password/setup/pairing, API-token and MCP login paths stay closed; Access is the sole HTTP login.
 

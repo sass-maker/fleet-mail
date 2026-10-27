@@ -10,6 +10,12 @@
 	],
 	"workers_dev": true,
 	"preview_urls": false,
+	"routes": [
+		{
+			"pattern": "mail.significanthobbies.com",
+			"custom_domain": true
+		}
+	],
 	"assets": {
 		"directory": ".svelte-kit/cloudflare",
 		"binding": "ASSETS"
@@ -21,7 +27,7 @@
 		"ACCESS_TEAM_DOMAIN": "https://long-frog-c8a6.cloudflareaccess.com",
 		"ACCESS_AUD": "7640cf667275edec959f017d47e84a675681f62fc409e3771d0c54731bbe7a80",
 		"ACCESS_OWNER_EMAIL": "sarthakagrawal927@gmail.com",
-		"APP_URL": "https://fleet-mail.sarthakagrawal927.workers.dev"
+		"APP_URL": "https://mail.significanthobbies.com"
 	},
 	"send_email": [
 		{
