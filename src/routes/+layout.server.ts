@@ -19,6 +19,7 @@ export const load: LayoutServerLoad = async ({ locals, platform }) => {
 	const aiDrafting = ready ? await hasAiProvider(db!, locals.user!.id) : false;
 
 	return {
+		ownerAccess: true,
 		user: locals.user,
 		domains: locals.domains,
 		addresses: locals.addresses,

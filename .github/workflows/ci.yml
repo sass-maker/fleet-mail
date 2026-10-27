@@ -20,8 +20,9 @@ jobs:
           bun-version: '1.3.14'
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
+      - run: pnpm run check:clean
       - run: pnpm run check
       - run: pnpm test
-      - run: node --test src/lib/server/owner-access.test.ts
+      - run: pnpm run test:owner-access
       - run: pnpm run build
       - run: pnpm exec wrangler deploy --dry-run

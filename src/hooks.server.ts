@@ -131,7 +131,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		localeFromAcceptLanguage(event.request.headers.get('accept-language'));
 
 	let accessOwner: App.Locals['user'] = null;
-	if (event.platform?.env.ACCESS_AUTH_ENABLED === 'true') {
+	{
+		if (!event.platform?.env) return jsonError('Cloudflare Access is not configured', 503);
 		const email = await verifyOwnerAccess(event.request, event.platform.env);
 		if (!email || !db) return jsonError('Cloudflare Access sign-in required', 403);
 		if (!ownerAccessOriginAllowed(event.request)) return jsonError('Invalid origin', 403);
@@ -161,12 +162,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (db) {
 		// Browser sessions take precedence so an incidental or stale Authorization
 		// header cannot downgrade a legitimate cookie-authenticated API request.
-		const activeToken = readSessionToken(event.cookies);
+		const activeToken = accessOwner ? null : readSessionToken(event.cookies);
 		let cookieSession: AuthenticatedSession | null = await getAuthenticatedSession(db, activeToken);
 
 		// Other accounts signed in on this browser. Only page loads need them (the
 		// switcher); API calls stay single-user and skip the extra query.
-		const linkedTokens = pathname.startsWith('/api/') ? [] : readLinkedTokens(event.cookies);
+		const linkedTokens = accessOwner || pathname.startsWith('/api/') ? [] : readLinkedTokens(event.cookies);
 		if (linkedTokens.length > 0) {
 			const parked = await resolveLinkedSessions(
 				db,
@@ -362,7 +363,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		const addingAccount =
 			(event.url.searchParams.get('add') === '1' ||
 				event.url.searchParams.get('setup') === 'complete') &&
-			!event.locals.user?.must_change_password;
+			!event.locals.user?.must_change_password && !accessOwner;
 		if (event.locals.user && !addingAccount) {
 			throw redirect(
 				303,

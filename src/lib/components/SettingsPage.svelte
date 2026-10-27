@@ -825,6 +825,7 @@
 		</ul>
 	</section>
 
+	{#if !$page.data.ownerAccess}
 	<section class="surface-lg card">
 		<div class="card-head">
 			<h2><Icon name="key-2-line" size={18} /> {t('settings.apiKeys')}</h2>
@@ -1009,6 +1010,7 @@
 		{#if pairError}<p class="error" role="status">{pairError}</p>{/if}
 		{#if deviceError}<p class="error" role="alert">{deviceError}</p>{/if}
 	</section>
+	{/if}
 	{/if}
 
 	{#if show('labels')}

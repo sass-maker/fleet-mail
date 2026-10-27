@@ -15,6 +15,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 
 const root = new URL('..', import.meta.url).pathname;
+const deployment = process.argv.includes('--deployment');
 
 // Anything matching these must never appear in a tracked file.
 const FORBIDDEN = [
@@ -30,7 +31,7 @@ const FORBIDDEN = [
 ];
 
 // Files whose whole job is to show what a secret looks like.
-const SKIP_FILES = new Set(['scripts/check-template-clean.mjs']);
+const SKIP_FILES = new Set(['scripts/check-template-clean.mjs', '.env.example', '.dev.vars.example']);
 const SKIP_EXTENSIONS = /\.(png|jpe?g|gif|ico|woff2?|ttf|eot|pdf|zip|lock)$/i;
 
 // A hit that is obviously a placeholder rather than a real credential.
@@ -63,6 +64,7 @@ for (const file of tracked) {
 	}
 
 	for (const { label, pattern } of FORBIDDEN) {
+		if (deployment && ['Live Cloudflare account id', 'Maintainer infrastructure name'].includes(label)) continue;
 		const match = contents.match(pattern);
 		if (match && !isPlaceholder(match[0])) {
 			const line = contents.slice(0, match.index).split('\n').length;
@@ -84,13 +86,13 @@ if (!existsSync(wranglerPath)) {
 	fail('wrangler.jsonc is missing');
 } else {
 	const wrangler = readFileSync(wranglerPath, 'utf8');
-	if (!wrangler.includes('REPLACE_WITH_YOUR_D1_DATABASE_ID')) {
+	if (!deployment && !wrangler.includes('REPLACE_WITH_YOUR_D1_DATABASE_ID')) {
 		fail(
 			'wrangler.jsonc no longer has the database_id placeholder — a real D1 id was committed'
 		);
 	}
 	const route = wrangler.match(/^\s*"pattern"\s*:\s*"([^"]+)"/m);
-	if (route && !route[1].includes('example.com')) {
+	if (!deployment && route && !route[1].includes('example.com')) {
 		fail(`wrangler.jsonc has a live route pattern: ${route[1]} — it should stay commented out`);
 	}
 	// The dashboard treats every wrangler var as a required HTML input.

@@ -169,9 +169,11 @@
 							<p class="menu-error" role="alert">{switchError}</p>
 						{/if}
 					{/if}
-					<a href={ADD_ACCOUNT_HREF} class="menu-item" role="menuitem" onclick={() => (menuOpen = false)}>
+					{#if !$page.data.ownerAccess}
+<a href={ADD_ACCOUNT_HREF} class="menu-item" role="menuitem" onclick={() => (menuOpen = false)}>
 						<Icon name="user-add-line" size={15} /> {t('account.addAccount')}
 					</a>
+{/if}
 
 					<div class="menu-divider"></div>
 					<a href="/settings" class="menu-item" role="menuitem" onclick={() => (menuOpen = false)}>

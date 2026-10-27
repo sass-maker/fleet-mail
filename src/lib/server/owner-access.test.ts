@@ -64,11 +64,18 @@ test('rejects incomplete or untrusted configuration', async () => {
 
 test('closes alternate setup, password, pairing and agent authentication routes', () => {
 	for (const path of ['/setup', '/api/setup', '/api/auth/login', '/api/auth/pair',
-		'/api/auth/pair/start', '/onboarding', '/mcp', '/mcp/', '/oauth/authorize',
+		'/api/auth/pair/start', '/api/auth/pair-codes', '/api/apikeys', '/api/oauth/grants',
+		'/api/%73etup', '/api/auth/%70air-codes', '/api/auth/complete-setup', '/api/admin/users',
+		'/mcp', '/mcp/', '/oauth/authorize',
 		'/.well-known/oauth-authorization-server']) {
 		assert.equal(ownerAccessRouteBlocked(path, 'POST'), true, path);
 	}
 	assert.equal(ownerAccessRouteBlocked('/api/auth/login', 'DELETE'), false);
+	assert.equal(ownerAccessRouteBlocked('/api/auth/me', 'GET'), false);
+	assert.equal(ownerAccessRouteBlocked('/onboarding', 'GET'), false);
+	assert.equal(ownerAccessRouteBlocked('/api/domains', 'POST'), false);
+	assert.equal(ownerAccessRouteBlocked('/api/addresses', 'POST'), false);
+	assert.equal(ownerAccessRouteBlocked('/api/%zz', 'POST'), true);
 	assert.equal(ownerAccessRouteBlocked('/api/reply', 'POST'), false);
 	assert.equal(ownerAccessRouteBlocked('/inbox', 'GET'), false);
 });

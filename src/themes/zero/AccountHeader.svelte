@@ -290,10 +290,12 @@
 					<p class="z-menu-error" role="alert">{switchError}</p>
 				{/if}
 			{/if}
-			<a href={ADD_ACCOUNT_HREF} onclick={closeMenus}>
+			{#if !$page.data.ownerAccess}
+<a href={ADD_ACCOUNT_HREF} onclick={closeMenus}>
 				<Icon name="Plus" size={16} />
 				{t('account.addAccount')}
 			</a>
+{/if}
 			<a href="/settings/general" onclick={closeMenus}>
 				<Icon name="SettingsGear" size={16} />
 				{t('nav.settings')}

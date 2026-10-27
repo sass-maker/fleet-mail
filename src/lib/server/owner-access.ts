@@ -1,7 +1,6 @@
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
 
 export type OwnerAccessEnv = {
-	ACCESS_AUTH_ENABLED?: string;
 	ACCESS_TEAM_DOMAIN?: string;
 	ACCESS_AUD?: string;
 	ACCESS_OWNER_EMAIL?: string;
@@ -49,11 +48,14 @@ export async function verifyOwnerAccess(
 
 /** The single-owner deployment does not expose alternate account/login paths. */
 export function ownerAccessRouteBlocked(pathname: string, method: string): boolean {
-	return ['/setup', '/api/setup', '/api/auth/pair', '/api/onboarding', '/onboarding',
+	try { pathname = decodeURIComponent(pathname); } catch { return true; }
+	if (pathname === '/api/auth/me' && method === 'GET') return false;
+	if (pathname === '/api/auth/login' && method === 'DELETE') return false;
+	if ((pathname === '/api/admin/users' || pathname.startsWith('/api/admin/users/')) && method !== 'GET') return true;
+	return ['/setup', '/api/setup', '/api/auth', '/api/apikeys', '/api/oauth',
 		'/mcp', '/oauth', '/.well-known/oauth-'].some(prefix =>
 			pathname === prefix || pathname.startsWith(`${prefix}/`) ||
-			(prefix.endsWith('-') && pathname.startsWith(prefix))) ||
-		(pathname === '/api/auth/login' && method !== 'DELETE');
+			(prefix.endsWith('-') && pathname.startsWith(prefix)));
 }
 
 export function ownerAccessOriginAllowed(request: Request): boolean {

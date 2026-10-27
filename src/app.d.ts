@@ -9,7 +9,6 @@ declare global {
 		interface Platform {
 			ctx: ExecutionContext;
 			env: {
-				ACCESS_AUTH_ENABLED?: string;
 				ACCESS_TEAM_DOMAIN?: string;
 				ACCESS_AUD?: string;
 				ACCESS_OWNER_EMAIL?: string;

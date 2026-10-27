@@ -4,6 +4,8 @@ This repository deploys Quickinbox for one owner on Cloudflare. Use `pnpm instal
 
 The upstream Quickinbox UI and MIT license are retained. The reference documentation below describes upstream features; optional AI, notifications, and API/MCP sending are not enabled for this deployment. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for verified scope.
 
+For an empty D1 database, run `pnpm db:migrate:remote` then `pnpm provision:remote` before routing mail to the Worker. The provisioner is idempotent, verifies the configured owner and all domains, preserves existing mail, and refuses a different existing owner. It creates Access-only login and `team@` sending identities; replies to other catch-all addresses use their exact receiving address. Use the corresponding `:local` commands for local storage. Production HTTP always requires verified Cloudflare Access, including when configuration is missing.
+
 ---
 
 # Quickinbox

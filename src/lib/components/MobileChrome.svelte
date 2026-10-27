@@ -247,10 +247,12 @@
 					</span>
 				</button>
 			{/each}
-			<a href={ADD_ACCOUNT_HREF} class="sheet-link">
+			{#if !$page.data.ownerAccess}
+<a href={ADD_ACCOUNT_HREF} class="sheet-link">
 				<Icon name="user-add-line" size={20} />
 				<span>{t('account.addAccount')}</span>
 			</a>
+{/if}
 			{#if switchError}
 				<p class="sheet-error" role="alert">{switchError}</p>
 			{/if}
