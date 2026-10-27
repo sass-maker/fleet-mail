@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -6,7 +7,8 @@ import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import PostalMime from "postal-mime";
 import { z } from "zod";
-import { sendEmail } from "./email-sender";
+import { DeliveryError, sendOutgoing } from "./lib/outbound";
+import { configuredDomains, defaultMailboxSettings, receivingAddress } from "../shared/mailboxes";
 import { storeAttachments, type StoredAttachment } from "./lib/attachments";
 import {
 	validateSender,
@@ -87,9 +89,9 @@ app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
 
 app.get("/api/v1/config", (c) => {
 	const domainsRaw = c.env.DOMAINS || "";
-	const domains = domainsRaw.split(",").map((d) => d.trim()).filter(Boolean);
+	const domains = configuredDomains(domainsRaw);
 	const emailAddresses = c.env.EMAIL_ADDRESSES ?? [];
-	return c.json({ domains, emailAddresses });
+	return c.json({ domains, emailAddresses, aiEnabled: c.env.AI_ENABLED === "true" });
 });
 
 // -- Mailboxes ------------------------------------------------------
@@ -101,16 +103,18 @@ app.get("/api/v1/mailboxes", async (c) => {
 
 app.post("/api/v1/mailboxes", async (c) => {
 	const { name, settings, email: rawEmail } = CreateMailboxBody.parse(await c.req.json());
-	const email = rawEmail.toLowerCase();
+	let email: string;
+	try { email = receivingAddress(rawEmail, configuredDomains(c.env.DOMAINS), c.env.EMAIL_ADDRESSES ?? []); } catch (error) { return c.json({ error: (error as Error).message }, 400); }
 	const allowedAddresses = (c.env.EMAIL_ADDRESSES ?? []) as string[];
 	if (allowedAddresses.length > 0 && !allowedAddresses.map((a) => a.toLowerCase()).includes(email)) {
 		return c.json({ error: "Mailbox creation is restricted to configured EMAIL_ADDRESSES" }, 403);
 	}
 	const key = `mailboxes/${email}.json`;
 	if (await c.env.BUCKET.head(key)) return c.json({ error: "Mailbox already exists" }, 409);
-	const defaultSettings = { fromName: name, forwarding: { enabled: false, email: "" }, signature: { enabled: false, text: "" }, autoReply: { enabled: false, subject: "", message: "" } };
+	const defaultSettings = defaultMailboxSettings(email, name);
 	const finalSettings = { ...defaultSettings, ...settings };
-	await c.env.BUCKET.put(key, JSON.stringify(finalSettings));
+	const created = await c.env.BUCKET.put(key, JSON.stringify(finalSettings), { onlyIf: { etagDoesNotMatch: "*" } });
+	if (!created) return c.json({ error: "Mailbox already exists" }, 409);
 	const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(email));
 	await stub.getFolders();
 	return c.json({ id: email, email, name, settings: finalSettings }, 201);
@@ -166,56 +170,21 @@ app.get("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 });
 
 app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
-	const mailboxId = c.req.param("mailboxId")!;
-	const body = SendEmailRequestSchema.parse(await c.req.json());
-	const { to, cc, bcc, from, subject, html, text, attachments, in_reply_to, references, thread_id } = body;
-
-	let toStr: string, fromEmail: string, fromDomain: string;
-	try {
-		({ toStr, fromEmail, fromDomain } = validateSender(to, from, mailboxId));
-	} catch (e) {
-		if (e instanceof SenderValidationError) return c.json({ error: e.message }, 400);
-		throw e;
-	}
-
-	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
-	const stub = c.var.mailboxStub;
-	const rateLimitError = await (stub as any).checkSendRateLimit();
-	if (rateLimitError) return c.json({ error: rateLimitError }, 429);
-	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
-
-	await stub.createEmail(Folders.SENT, {
-		id: messageId, subject, sender: fromEmail, recipient: toStr,
-		cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc).toLowerCase() : null,
-		bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc).toLowerCase() : null,
-		date: new Date().toISOString(), body: html || text || "",
-		in_reply_to: in_reply_to || null, email_references: references ? JSON.stringify(references) : null,
-		thread_id: thread_id || in_reply_to || messageId, message_id: outgoingMessageId,
-		raw_headers: JSON.stringify([
-			{ key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
-			{ key: "to", value: Array.isArray(to) ? to.join(", ") : to },
-			...(cc ? [{ key: "cc", value: Array.isArray(cc) ? cc.join(", ") : cc }] : []),
-			...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
-			{ key: "subject", value: subject }, { key: "date", value: new Date().toISOString() },
-			{ key: "message-id", value: `<${outgoingMessageId}>` },
-		]),
-	}, attachmentData);
-
-	c.executionCtx.waitUntil(
-		sendEmail(c.env.EMAIL, {
-			to, cc, bcc, from, subject, html, text,
-			attachments: attachments?.map((att) => ({ content: att.content, filename: att.filename, type: att.type, disposition: att.disposition || "attachment", contentId: att.contentId })),
-			...(in_reply_to ? { headers: buildThreadingHeaders(in_reply_to, references || []) } : {}),
-		}).catch((e) => console.error("Deferred email delivery failed:", (e as Error).message)),
-	);
-	return c.json({ id: messageId, status: "sent" }, 202);
+ const mailboxId = c.req.param("mailboxId")!;
+ const body = SendEmailRequestSchema.parse(await c.req.json());
+ try { return c.json(await sendOutgoing(c.env, mailboxId, body)); }
+ catch (error) {
+  if (error instanceof DeliveryError) return c.json({ error: error.message, id: error.id }, error.status);
+  if (error instanceof SenderValidationError) return c.json({ error: error.message }, 400);
+  throw error;
+ }
 });
 
 app.post("/api/v1/mailboxes/:mailboxId/drafts", async (c: AppContext) => {
 	const mailboxId = c.req.param("mailboxId")!;
 	const { to, cc, bcc, subject, body, in_reply_to, thread_id, draft_id } = DraftBody.parse(await c.req.json());
 	const stub = c.var.mailboxStub;
-	if (draft_id) await stub.deleteEmail(draft_id); // not atomic — create-then-delete would be safer
+	if (draft_id && (await stub.getEmail(draft_id))?.delivery_status) return c.json({ error: "A send attempt cannot be replaced as a draft. Compose a replacement only after checking its outcome." }, 409);
 	const messageId = crypto.randomUUID();
 	const now = new Date().toISOString();
 	await stub.createEmail(Folders.DRAFT, {
@@ -224,6 +193,7 @@ app.post("/api/v1/mailboxes/:mailboxId/drafts", async (c: AppContext) => {
 		date: now, body, in_reply_to: in_reply_to || null, email_references: null,
 		thread_id: thread_id || in_reply_to || messageId,
 	}, []);
+	if (draft_id) await stub.deleteEmail(draft_id);
 	return c.json({ id: messageId, status: "draft", subject: subject || "", recipient: to || "", date: now }, 201);
 });
 
@@ -342,36 +312,33 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 		result.set(value, bytesRead);
 		bytesRead += value.length;
 	}
+	if (bytesRead !== streamSize) throw new Error("Email stream ended before declared size");
 	return result;
 }
 
-async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env: Env, ctx: ExecutionContext) {
+async function receiveEmail(event: { to: string; raw: ReadableStream; rawSize: number }, env: Env, ctx: ExecutionContext) {
+	const mailboxId = receivingAddress(event.to, configuredDomains(env.DOMAINS), env.EMAIL_ADDRESSES ?? []);
 	const rawEmail = await streamToArrayBuffer(event.raw, event.rawSize);
+	const addressBytes = new TextEncoder().encode(mailboxId + "\n");
+	const dedupeBytes = new Uint8Array(addressBytes.length + rawEmail.length);
+	dedupeBytes.set(addressBytes);
+	dedupeBytes.set(rawEmail, addressBytes.length);
+	const digest = await crypto.subtle.digest("SHA-256", dedupeBytes);
+	const messageId = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+	await env.BUCKET.put(`raw/${encodeURIComponent(mailboxId)}/${messageId}.eml`, rawEmail);
 	const parsedEmail = await new PostalMime().parse(rawEmail);
 
-	if (!parsedEmail.to?.length || !parsedEmail.to[0].address) throw new Error("received email with empty to");
-
-	const allowedAddresses = ((env.EMAIL_ADDRESSES ?? []) as string[]).map((a) => a.toLowerCase());
-	const allRecipients = parsedEmail.to.map((t) => t.address?.toLowerCase()).filter(Boolean) as string[];
-	const ccRecipients = (parsedEmail.cc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
-	const bccRecipients = (parsedEmail.bcc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
-
-	let mailboxId: string | undefined;
-	if (allowedAddresses.length > 0) {
-		mailboxId = allRecipients.find((addr) => allowedAddresses.includes(addr));
-		if (!mailboxId) { console.log(`Ignoring email: no recipient matches EMAIL_ADDRESSES.`); return; }
-	} else { mailboxId = allRecipients[0]; }
-	if (!mailboxId) throw new Error("received email with no valid recipient address");
-
-	const messageId = crypto.randomUUID();
-	if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) { console.log(`Ignoring email for ${mailboxId}: mailbox does not exist`); return; }
+ const allRecipients = (parsedEmail.to || []).map((entry) => entry.address).filter(Boolean) as string[];
+ const ccRecipients = (parsedEmail.cc || []).map((entry) => entry.address).filter(Boolean) as string[];
+ const bccRecipients = (parsedEmail.bcc || []).map((entry) => entry.address).filter(Boolean) as string[];
+ await env.BUCKET.put(`mailboxes/${mailboxId}.json`, JSON.stringify(defaultMailboxSettings(mailboxId)), { onlyIf: { etagDoesNotMatch: "*" } });
 
 	const stub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
 
 	const attachmentData: StoredAttachment[] = [];
 	if (parsedEmail.attachments) {
 		for (const att of parsedEmail.attachments) {
-			const attId = crypto.randomUUID();
+			const attId = `${messageId}-${attachmentData.length}`;
 			const filename = (att.filename || "untitled").replace(/[\/\\:*?"<>|\x00-\x1f]/g, "_");
 			await env.BUCKET.put(`attachments/${messageId}/${attId}/${filename}`, att.content);
 			attachmentData.push({ id: attId, email_id: messageId, filename, mimetype: att.mimeType,
@@ -383,14 +350,13 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 	const extractMsgId = (s: string) => { const m = s.match(/<([^>]+)>/); return m ? m[1] : s.trim().split(/\s+/)[0]; };
 	const inReplyTo = parsedEmail.inReplyTo ? extractMsgId(parsedEmail.inReplyTo) : null;
 	const emailReferences = parsedEmail.references ? parsedEmail.references.split(/\s+/).filter(Boolean).map(extractMsgId) : [];
-	let threadId = emailReferences[0] || inReplyTo || messageId;
+	const originalMessageId = parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : null;
+	let threadId = emailReferences[0] || inReplyTo || originalMessageId || messageId;
 
 	if (!inReplyTo && emailReferences.length === 0) {
 		const subjectThread = await (stub as any).findThreadBySubject(parsedEmail.subject || "", parsedEmail.from?.address || undefined);
 		if (subjectThread) threadId = subjectThread;
 	}
-
-	const originalMessageId = parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : null;
 
 	await stub.createEmail(Folders.INBOX, {
 		id: messageId, subject: parsedEmail.subject || "",
@@ -402,6 +368,7 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(parsedEmail.headers),
 	}, attachmentData);
 
+	if (env.AI_ENABLED !== "true") return;
 	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
 	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {
 		method: "POST", headers: { "Content-Type": "application/json" },

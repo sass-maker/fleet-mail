@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -71,7 +72,9 @@ interface GetEmailsOptions {
 	sortDirection?: "ASC" | "DESC";
 }
 
-interface EmailData {
+export interface EmailData {
+	delivery_status?: "pending" | "accepted" | "unknown" | null;
+	delivery_fingerprint?: string | null;
 	id: string;
 	subject: string;
 	sender: string;
@@ -89,7 +92,7 @@ interface EmailData {
 	raw_headers?: string | null;
 }
 
-interface AttachmentData {
+export interface AttachmentData {
 	id: string;
 	email_id: string;
 	filename: string;
@@ -160,6 +163,7 @@ export class MailboxDO extends DurableObject<Env> {
 				email_references: schema.emails.email_references,
 				thread_id: schema.emails.thread_id,
 				folder_id: schema.emails.folder_id,
+				delivery_status: schema.emails.delivery_status,
 				snippet: sql<string>`SUBSTR(${schema.emails.body}, 1, 300)`,
 			})
 			.from(schema.emails)
@@ -266,7 +270,7 @@ export class MailboxDO extends DurableObject<Env> {
 				SELECT
 					lp.id, lp.subject, lp.sender, lp.recipient, lp.date,
 					lp.read, lp.starred, lp.thread_id, lp.folder_id,
-					lp.in_reply_to, lp.email_references,
+					lp.in_reply_to, lp.email_references, lp.delivery_status,
 					SUBSTR(lp.body, 1, 300) as snippet,
 					ds.thread_count, ds.thread_unread_count, ds.participants
 				FROM latest_per_group lp
@@ -354,7 +358,7 @@ export class MailboxDO extends DurableObject<Env> {
 			SELECT
 				lif.id, lif.subject, lif.sender, lif.recipient, lif.date,
 				lif.read, lif.starred, lif.thread_id, lif.folder_id,
-				lif.in_reply_to, lif.email_references,
+				lif.in_reply_to, lif.email_references, lif.delivery_status,
 				SUBSTR(lif.body, 1, 300) as snippet,
 				cs.thread_count, cs.thread_unread_count, cs.participants,
 				CASE WHEN lmc.folder_id != (SELECT id FROM folders WHERE name = 'sent' LIMIT 1)
@@ -816,6 +820,38 @@ export class MailboxDO extends DurableObject<Env> {
 		return null;
 	}
 
+ async beginDelivery(email: EmailData, attachments: AttachmentData[]) {
+  return this.ctx.storage.transactionSync(() => {
+   const existing = [...this.ctx.storage.sql.exec("SELECT fingerprint, status FROM send_attempts WHERE id = ?", email.id)][0] as { fingerprint: string; status: string } | undefined;
+   if (existing) {
+    if (existing.fingerprint !== email.delivery_fingerprint) throw new Error("Send ID already belongs to different content");
+    return { claimed: false, status: existing.status, id: email.id };
+   }
+   for (const [window, maximum] of [["-1 hour", 20], ["-1 day", 100]] as const) {
+    const row = [...this.ctx.storage.sql.exec(`SELECT COUNT(*) AS count FROM send_attempts WHERE julianday(created_at) >= julianday('now', ?)`, window)][0] as { count: number };
+    if (row.count >= maximum) throw new Error(`Send attempt limit exceeded: ${maximum} per ${window === "-1 hour" ? "hour" : "day"}`);
+   }
+   this.ctx.storage.sql.exec("INSERT INTO send_attempts (id, fingerprint, status, created_at) VALUES (?, ?, 'pending', ?)", email.id, email.delivery_fingerprint || "", email.date);
+   this.ctx.storage.sql.exec(`INSERT INTO emails (id,folder_id,subject,sender,recipient,cc,bcc,date,read,starred,body,in_reply_to,email_references,thread_id,raw_headers,delivery_status,delivery_fingerprint) VALUES (?,?,?,?,?,?,?,?,1,0,?,?,?,?,?,'pending',?)`, email.id, Folders.DRAFT, email.subject, email.sender, email.recipient, email.cc ?? null, email.bcc ?? null, email.date, email.body, email.in_reply_to ?? null, email.email_references ?? null, email.thread_id ?? email.id, email.raw_headers ?? null, email.delivery_fingerprint ?? null);
+   if (attachments.length) this.db.insert(schema.attachments).values(attachments).run();
+   return { claimed: true, status: "pending", id: email.id };
+  });
+ }
+
+ async completeDelivery(id: string, messageId: string) {
+  this.ctx.storage.transactionSync(() => {
+   this.ctx.storage.sql.exec(`UPDATE emails SET folder_id = ?, delivery_status = 'accepted', message_id = ?, thread_id = CASE WHEN thread_id = id THEN ? ELSE thread_id END, read = 1 WHERE id = ?`, Folders.SENT, messageId, messageId, id);
+   this.ctx.storage.sql.exec("UPDATE send_attempts SET status = 'accepted' WHERE id = ?", id);
+  });
+ }
+
+ async markDeliveryUnknown(id: string) {
+  this.ctx.storage.transactionSync(() => {
+   this.db.update(schema.emails).set({ delivery_status: "unknown" }).where(and(eq(schema.emails.id, id), eq(schema.emails.delivery_status, "pending"))).run();
+   this.ctx.storage.sql.exec("UPDATE send_attempts SET status = 'unknown' WHERE id = ? AND status = 'pending'", id);
+  });
+ }
+
 	// ── Email creation (Drizzle) ───────────────────────────────────
 
 	async createEmail(
@@ -841,6 +877,7 @@ export class MailboxDO extends DurableObject<Env> {
 		const folderId = folderRow.id;
 		const isSent = folderId === Folders.SENT;
 
+		this.ctx.storage.transactionSync(() => {
 		// Sent emails are always read — the sender obviously knows what they wrote.
 		// This prevents sent replies from inflating thread_unread_count.
 		this.db
@@ -862,11 +899,15 @@ export class MailboxDO extends DurableObject<Env> {
 				thread_id: email.thread_id ?? null,
 				message_id: email.message_id ?? null,
 				raw_headers: email.raw_headers ?? null,
+				delivery_status: email.delivery_status ?? null,
+				delivery_fingerprint: email.delivery_fingerprint ?? null,
 			})
+			.onConflictDoNothing()
 			.run();
 
 		if (attachments.length > 0) {
-			this.db.insert(schema.attachments).values(attachments).run();
+			this.db.insert(schema.attachments).values(attachments).onConflictDoNothing().run();
 		}
+		});
 	}
 }

@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -168,4 +169,5 @@ export const mailboxMigrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_emails_folder_date ON emails(folder_id, date DESC);
         `,
 	},
+	{ name: "9_add_delivery_status", sql: `ALTER TABLE emails ADD COLUMN delivery_status TEXT; ALTER TABLE emails ADD COLUMN delivery_fingerprint TEXT; CREATE TABLE send_attempts (id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL);` },
 ];

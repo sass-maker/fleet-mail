@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -190,8 +191,8 @@ export default function EmailListRoute() {
 	const prevFolderRef = useRef<string | undefined>(undefined);
 
 	useEffect(() => {
-		const folderChanged = prevFolderRef.current !== `${mailboxId}/${folder}`;
-		prevFolderRef.current = `${mailboxId}/${folder}`;
+		const folderChanged = prevFolderRef.current !== `${encodeURIComponent(mailboxId || "")}/${folder}`;
+		prevFolderRef.current = `${encodeURIComponent(mailboxId || "")}/${folder}`;
 
 		if (folderChanged) {
 			closePanel();

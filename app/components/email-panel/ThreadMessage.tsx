@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -156,7 +157,8 @@ export default function ThreadMessage({
 					</div>
 				</div>
 
-				<div className="md:ml-[42px]">
+				{email.delivery_status && <p role="status" className="mb-3 rounded-md bg-kumo-fill px-3 py-2 text-sm text-kumo-default">{email.delivery_status === "accepted" ? "Accepted by the sending provider. This does not confirm recipient delivery." : email.delivery_status === "pending" ? "Send started. The outcome has not been confirmed. Check before sending again." : "Sending was not confirmed. This copy is retained for recovery. Check before sending again."}</p>}
+    <div className="md:ml-[42px]">
 					<EmailIframe
 						body={rewriteInlineImages(
 							email.body || "",
@@ -177,7 +179,7 @@ export default function ThreadMessage({
 								icon={<PaperPlaneTiltIcon size={14} />}
 								onClick={onSendDraft}
 								loading={isSending}
-								disabled={isSending}
+								disabled={isSending || !!email.delivery_status}
 							>
 								{isSending ? "Sending..." : "Send"}
 							</Button>
@@ -188,7 +190,7 @@ export default function ThreadMessage({
 								size="sm"
 								icon={<PencilSimpleIcon size={14} />}
 								onClick={onEditDraft}
-								disabled={isSending}
+								disabled={isSending || !!email.delivery_status}
 							>
 								Edit
 							</Button>
@@ -199,7 +201,7 @@ export default function ThreadMessage({
 								size="sm"
 								icon={<TrashIcon size={14} />}
 								onClick={onDeleteDraft}
-								disabled={isSending}
+								disabled={isSending || !!email.delivery_status}
 							>
 								Discard
 							</Button>

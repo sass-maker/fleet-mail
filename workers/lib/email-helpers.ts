@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -37,11 +38,17 @@ export function getMailboxStub(
 export async function listMailboxes(
 	bucket: R2Bucket,
 ): Promise<{ id: string; email: string }[]> {
-	const list = await bucket.list({ prefix: "mailboxes/" });
-	return list.objects.map((obj) => {
-		const id = obj.key.replace("mailboxes/", "").replace(".json", "");
-		return { id, email: id };
-	});
+ const objects: R2Object[] = [];
+ let cursor: string | undefined;
+ do {
+  const page = await bucket.list({ prefix: "mailboxes/", cursor });
+  objects.push(...page.objects);
+  cursor = page.truncated ? page.cursor : undefined;
+ } while (cursor);
+ return objects.map((obj) => {
+  const id = obj.key.slice("mailboxes/".length, -".json".length);
+  return { id, email: id };
+ });
 }
 
 // ── Sender Validation ──────────────────────────────────────────────

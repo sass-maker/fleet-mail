@@ -118,6 +118,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			const fromName = currentMailbox.settings?.fromName || currentMailbox.name;
 			const from = fromName && fromName !== currentMailbox.email ? { email: currentMailbox.email, name: fromName } : currentMailbox.email;
 			const originalEmail = target.in_reply_to ? allMessages.find((msg) => msg.id === target.in_reply_to) : undefined;
+			if (target.delivery_status && target.delivery_status !== "accepted") { toastManager.add({ title: "This send attempt has an unconfirmed outcome. Check before creating another message.", variant: "error" }); return; }
 			const emailData = {
 				to: toEmailListValue(toRecipients),
 				cc: toEmailListValue(splitEmailList(target.cc)),
@@ -129,7 +130,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			};
 			if (originalEmail) await replyMut.mutateAsync({ mailboxId, emailId: originalEmail.id, email: emailData }); else await sendEmailMut.mutateAsync({ mailboxId, email: emailData });
 			await deleteEmailMut.mutateAsync({ mailboxId, id: target.id });
-			toastManager.add({ title: "Email sent!" });
+			toastManager.add({ title: "Email accepted for sending" });
 			if (isDraftFolder) closePanel();
 		} catch (err) {
 			const message = (err instanceof Error ? err.message : null) || "Failed to send email.";

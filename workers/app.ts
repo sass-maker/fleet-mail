@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -84,9 +85,11 @@ app.use("*", async (c, next) => {
 // Must be before API routes and React Router catch-all
 const mcpHandler = EmailMCP.serve("/mcp", { binding: "EMAIL_MCP" });
 app.all("/mcp", async (c) => {
+	if (c.env.AI_ENABLED !== "true") return c.text("AI and MCP are disabled", 404);
 	return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
 });
 app.all("/mcp/*", async (c) => {
+	if (c.env.AI_ENABLED !== "true") return c.text("AI and MCP are disabled", 404);
 	return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
 });
 
@@ -95,6 +98,7 @@ app.route("/", apiApp);
 
 // Agent WebSocket routing - must be before React Router catch-all
 app.all("/agents/*", async (c) => {
+	if (c.env.AI_ENABLED !== "true") return c.text("AI is disabled", 404);
 	const response = await routeAgentRequest(c.req.raw, c.env);
 	if (response) return response;
 	return c.text("Agent not found", 404);
@@ -111,7 +115,7 @@ app.all("*", (c) => {
 export default {
 	fetch: app.fetch,
 	async email(
-		event: { raw: ReadableStream; rawSize: number },
+		event: { to: string; raw: ReadableStream; rawSize: number },
 		env: Env,
 		ctx: ExecutionContext,
 	) {

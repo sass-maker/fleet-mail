@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -185,7 +186,7 @@ export function rewriteInlineImages(
 	let result = body;
 	for (const att of attachments) {
 		if (att.disposition === "inline" && att.content_id) {
-			const url = `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${att.id}`;
+			const url = `/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${emailId}/attachments/${att.id}`;
 			// Strip angle brackets from content_id if present
 			const cid = att.content_id.startsWith("<")
 				? att.content_id.slice(1, -1)
@@ -205,7 +206,7 @@ export function getAttachmentUrl(
 	emailId: string,
 	attachmentId: string,
 ): string {
-	return `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${attachmentId}`;
+	return `/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${emailId}/attachments/${attachmentId}`;
 }
 
 export function downloadFile(url: string, filename: string) {
@@ -217,4 +218,16 @@ export function downloadFile(url: string, filename: string) {
 	document.body.appendChild(link);
 	link.click();
 	document.body.removeChild(link);
+}
+
+export function replyAddress(email: { sender: string; raw_headers?: string | null }): string {
+ try {
+  const headers = JSON.parse(email.raw_headers || "[]") as { key: string; value: string }[];
+  const header = headers.find((entry) => entry.key.toLowerCase() === "reply-to")?.value;
+  if (header) {
+   const address = header.match(/<([^<>]+)>/)?.[1] || header.trim();
+   if (/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(address)) return address;
+  }
+ } catch { }
+ return email.sender;
 }

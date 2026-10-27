@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -14,7 +15,10 @@ import { z } from "zod";
 
 // ── TypeScript Interfaces ──────────────────────────────────────────
 
+export type DeliveryStatus = "pending" | "accepted" | "unknown";
+
 export interface EmailMetadata {
+	delivery_status?: DeliveryStatus | null;
 	id: string;
 	subject: string;
 	sender: string;
@@ -60,6 +64,7 @@ export const ErrorResponseSchema = z.object({
 
 export const SendEmailRequestSchema = z
 	.object({
+		send_id: z.string().uuid().optional(),
 		to: RecipientFieldSchema,
 		cc: RecipientFieldSchema.optional(),
 		bcc: RecipientFieldSchema.optional(),

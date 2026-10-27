@@ -1,7 +1,11 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import { useQuery } from "@tanstack/react-query";
+import api from "~/services/api";
+import { queryKeys } from "~/queries/keys";
 import { Button, Input, Tooltip } from "@cloudflare/kumo";
 import { GearSixIcon, ListIcon, MagnifyingGlassIcon, RobotIcon, XIcon } from "@phosphor-icons/react";
 import { type KeyboardEvent, useEffect, useState } from "react";
@@ -9,6 +13,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import { useUIStore } from "~/hooks/useUIStore";
 
 export default function Header() {
+	const { data: config } = useQuery({ queryKey: queryKeys.config, queryFn: () => api.getConfig(), staleTime: Infinity });
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 	const { mailboxId } = useParams<{ mailboxId: string }>();
@@ -28,7 +33,7 @@ export default function Header() {
 	const performSearch = () => {
 		if (mailboxId && searchQuery.trim()) {
 			const q = searchQuery.trim();
-			navigate(`/mailbox/${mailboxId}/search?q=${encodeURIComponent(q)}`);
+			navigate(`/mailbox/${encodeURIComponent(mailboxId || "")}/search?q=${encodeURIComponent(q)}`);
 			setIsSearchExpanded(false);
 		}
 	};
@@ -36,7 +41,7 @@ export default function Header() {
 	const clearSearch = () => {
 		setSearchQuery("");
 		if (location.pathname.includes("/search") && mailboxId) {
-			navigate(`/mailbox/${mailboxId}/emails/inbox`);
+			navigate(`/mailbox/${encodeURIComponent(mailboxId || "")}/emails/inbox`);
 		}
 	};
 
@@ -119,7 +124,7 @@ export default function Header() {
 			)}
 
 			<div className="flex items-center gap-1 ml-auto shrink-0">
-				<Tooltip content={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"} side="bottom" asChild>
+				{config?.aiEnabled && <Tooltip content={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"} side="bottom" asChild>
 					<Button
 						variant={isAgentPanelOpen ? "secondary" : "ghost"}
 						shape="square"
@@ -128,7 +133,7 @@ export default function Header() {
 						aria-label="Toggle agent panel"
 						className="hidden lg:inline-flex"
 					/>
-				</Tooltip>
+				</Tooltip>}
 				<Tooltip content="Settings" side="bottom" asChild>
 					<Button
 						variant={isSettingsActive ? "secondary" : "ghost"}
@@ -137,8 +142,8 @@ export default function Header() {
 						onClick={() =>
 							navigate(
 								isSettingsActive
-									? `/mailbox/${mailboxId}/emails/inbox`
-									: `/mailbox/${mailboxId}/settings`,
+									? `/mailbox/${encodeURIComponent(mailboxId || "")}/emails/inbox`
+									: `/mailbox/${encodeURIComponent(mailboxId || "")}/settings`,
 							)
 						}
 						aria-label="Settings"

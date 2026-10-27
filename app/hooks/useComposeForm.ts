@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -6,6 +7,7 @@ import { useKumoToastManager } from "@cloudflare/kumo";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
 	buildQuotedReplyBlock,
+	replyAddress,
 	escapeHtml,
 	formatComposeDate,
 	getSignatureBlock,
@@ -76,7 +78,7 @@ function buildReplyAllFields(
 ) {
 	const toRecipients: string[] = [];
 	const toSeen = new Set<string>();
-	appendUniqueAddress(toRecipients, toSeen, original.sender, selfAddress);
+	appendUniqueAddress(toRecipients, toSeen, replyAddress(original), selfAddress);
 
 	for (const recipient of splitEmailList(original.recipient)) {
 		appendUniqueAddress(toRecipients, toSeen, recipient, selfAddress);
@@ -132,7 +134,7 @@ function buildInitialComposeFields(
 	if (mode === "reply") {
 		return {
 			...EMPTY_FIELDS,
-			to: original.sender,
+			to: replyAddress(original),
 			subject: getPrefixedSubject(original.subject, "Re"),
 			body: `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}${buildQuotedReplyBlock(original.date, original.sender, original.body || "")}`,
 		};
@@ -181,6 +183,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const [error, setError] = useState<string | null>(null);
 	const [isSavingDraft, setIsSavingDraft] = useState(false);
 	const [isSending, setIsSending] = useState(false);
+	const sendAttempt = useRef<{ content: string; id: string } | null>(null);
 	const lastInitializedOptionsRef = useRef<typeof composeOptions | null>(null);
 	const isDraftEdit = !!composeOptions.draftEmail;
 
@@ -194,6 +197,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	useEffect(() => {
 		if (lastInitializedOptionsRef.current === composeOptions) return;
 		lastInitializedOptionsRef.current = composeOptions;
+		sendAttempt.current = null;
 
 		const initialFields = buildInitialComposeFields(
 			composeOptions,
@@ -235,6 +239,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const handleSend = async (e: FormEvent, onClose: () => void) => {
 		e.preventDefault(); if (isSending) return; setError(null);
 		if (!currentMailbox || !mailboxId) { setError("No mailbox selected."); return; }
+		if (composeOptions.draftEmail?.delivery_status && composeOptions.draftEmail.delivery_status !== "accepted") { setError("This send attempt has an unconfirmed outcome. Check it before composing a replacement message."); return; }
 		const toRecipients = splitEmailList(to);
 		if (toRecipients.length === 0) { setError("Add at least one recipient."); return; }
 		const ccRecipients = splitEmailList(cc); const bccRecipients = splitEmailList(bcc);
@@ -249,14 +254,18 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 			html: body,
 			text: htmlToPlainText(body),
 		};
+		const content = JSON.stringify(emailData);
+		if (!sendAttempt.current || sendAttempt.current.content !== content) sendAttempt.current = { content, id: crypto.randomUUID() };
+		const requestData = { ...emailData, send_id: sendAttempt.current.id };
 		const draftId = composeOptions.draftEmail?.id; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
 		setIsSending(true); toastManager.add({ title: "Sending email..." });
 		try {
-			if ((mode === "reply" || mode === "reply-all") && originalId) await replyMutation.mutateAsync({ mailboxId, emailId: originalId, email: emailData });
-			else if (mode === "forward" && originalId) await forwardMutation.mutateAsync({ mailboxId, emailId: originalId, email: emailData });
-			else await sendEmailMutation.mutateAsync({ mailboxId, email: emailData });
+			if ((mode === "reply" || mode === "reply-all") && originalId) await replyMutation.mutateAsync({ mailboxId, emailId: originalId, email: requestData });
+			else if (mode === "forward" && originalId) await forwardMutation.mutateAsync({ mailboxId, emailId: originalId, email: requestData });
+			else await sendEmailMutation.mutateAsync({ mailboxId, email: requestData });
 			if (draftId) deleteEmailMutation.mutate({ mailboxId, id: draftId });
-			toastManager.add({ title: "Email sent!" });
+			toastManager.add({ title: "Email accepted for sending" });
+			sendAttempt.current = null;
 			onClose();
 		} catch (err: unknown) { const message = (err instanceof Error ? err.message : null) || "Failed to send email."; setError(message); toastManager.add({ title: message, variant: "error" }); }
 		finally { setIsSending(false); }

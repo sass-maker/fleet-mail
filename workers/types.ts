@@ -1,8 +1,10 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
 export interface Env extends Cloudflare.Env {
+	AI_ENABLED?: string;
 	POLICY_AUD: string;
 	TEAM_DOMAIN: string;
 }

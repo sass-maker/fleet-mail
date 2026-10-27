@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -18,7 +19,8 @@ import { useMemo, useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router";
 import { Folders, SYSTEM_FOLDER_IDS } from "shared/folders";
 import { useCreateFolder, useFolders } from "~/queries/folders";
-import { useMailbox } from "~/queries/mailboxes";
+import { groupMailboxes } from "../../shared/mailboxes";
+import { useMailboxes, useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 
 const FOLDER_ICONS: Record<string, React.ReactNode> = {
@@ -76,6 +78,8 @@ function FolderLink({
 export default function Sidebar() {
 	const { mailboxId } = useParams<{ mailboxId: string }>();
 	const navigate = useNavigate();
+	const { data: allMailboxes = [] } = useMailboxes();
+	const groups = groupMailboxes([...new Set(allMailboxes.map((mailbox) => mailbox.email.split("@")[1]))].sort(), allMailboxes);
 	const { data: folders = [] } = useFolders(mailboxId);
 	const createFolderMutation = useCreateFolder();
 	const { startCompose, closeSidebar } = useUIStore();
@@ -162,13 +166,21 @@ export default function Sidebar() {
 				{SYSTEM_FOLDER_LINKS.map((folder) => (
 					<FolderLink
 						key={folder.id}
-						to={`/mailbox/${mailboxId}/emails/${folder.id}`}
+						to={`/mailbox/${encodeURIComponent(mailboxId || "")}/emails/${folder.id}`}
 						icon={FOLDER_ICONS[folder.id]}
 						label={folder.label}
 						unreadCount={getUnreadCount(folder.id)}
 						onClick={handleNavClick}
 					/>
 				))}
+
+    <div className="pt-5 pb-2">
+     <h2 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-kumo-subtle">Domains</h2>
+     {groups.map(({ domain, addresses }) => <details key={domain} open={domain === mailboxId?.split("@")[1]} className="mb-1">
+      <summary className="cursor-pointer break-all rounded-md px-3 py-2 text-sm font-medium text-kumo-default hover:bg-kumo-tint">{domain}</summary>
+      <div className="pl-3">{addresses.map((address) => <NavLink key={address.id} to={`/mailbox/${encodeURIComponent(address.id)}/emails/inbox`} onClick={handleNavClick} className={`block break-all rounded-md px-3 py-2 text-sm ${address.id === mailboxId ? "bg-kumo-fill font-semibold text-kumo-default" : "text-kumo-strong hover:bg-kumo-tint"}`}>{address.email.split("@")[0]}</NavLink>)}</div>
+     </details>)}
+    </div>
 
 				{/* Custom folders */}
 				{customFolders.length > 0 && (
@@ -191,7 +203,7 @@ export default function Sidebar() {
 						{customFolders.map((folder) => (
 							<FolderLink
 								key={folder.id}
-								to={`/mailbox/${mailboxId}/emails/${folder.id}`}
+								to={`/mailbox/${encodeURIComponent(mailboxId || "")}/emails/${folder.id}`}
 								icon={<FolderIcon size={18} />}
 								label={folder.name}
 								unreadCount={folder.unreadCount}

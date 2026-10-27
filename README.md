@@ -1,98 +1,63 @@
-<div align="center">
-  <h1>Agentic Inbox</h1>
-  <p><em>A self-hosted email client with an AI agent, running entirely on Cloudflare Workers</em></p>
-</div>
+# Domain Inbox
 
-Agentic Inbox lets you send, receive, and manage emails through a modern web interface -- all powered by your own Cloudflare account. Incoming emails arrive via [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/), each mailbox is isolated in its own [Durable Object](https://developers.cloudflare.com/durable-objects/) with a SQLite database, and attachments are stored in [R2](https://developers.cloudflare.com/r2/).
+A private catch-all inbox for your domains. Every receiving address appears automatically under its domain, and replies use that exact address.
 
-An **AI-powered Email Agent** can read your inbox, search conversations, and draft replies -- built with the [Cloudflare Agents SDK](https://developers.cloudflare.com/agents/) and [Workers AI](https://developers.cloudflare.com/workers-ai/).
+Adapted from [Cloudflare Agentic Inbox](https://github.com/cloudflare/agentic-inbox) at `48039bb6785af34e592c2966f87cde2b255c4c80`. Cloudflare's copyright and Apache-2.0 license are retained in [LICENSE](LICENSE).
 
-![Agentic Inbox screenshot](./demo_app.png)
+## Included
 
+- New incoming mail at any username on configured domains.
+- Domain and address navigation, conversations, search, drafts and attachments.
+- Envelope-recipient routing for direct, CC and BCC mail.
+- Replies from the receiving mailbox and normal Reply-To support.
+- Raw message preservation and duplicate-safe ingestion.
+- Saved outbound attempts with provider acceptance or unconfirmed status.
+- Private access through Cloudflare Access in production.
 
-Read the blog post to learn more about Cloudflare Email Service and how to use it with the Agents SDK, MCP, and from the Wrangler CLI: [Email for Agents](https://blog.cloudflare.com/email-for-agents/).
+Historical personal-inbox import is excluded. AI and MCP are disabled by default, and the app sends no third-party analytics.
 
-## How to setup
+## Run locally
 
-**Important**: Clicking the 'Deploy to Cloudflare' button is only one part of the setup. You must follow the **After deploying** steps as well. For a full step-by-step guide with screenshots, refer to this comment: 
-https://github.com/cloudflare/agentic-inbox/issues/4#issuecomment-4269118513
+Use Node 24 and the checked-in npm lockfile.
 
-### To set up
-
-1. Deploy to Cloudflare. The deploy flow will automatically provision R2, Durable Objects, and Workers AI. You'll be prompted for **DOMAINS**, which is the domain (yourdomain.com) you want to receive emails for (email@yourdomain.com).
-
-     [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/agentic-inbox)
-
-2. **Configure Cloudflare Access** -- Enable [one-click Cloudflare Access](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/) on your Worker under Settings > Domains & Routes. The modal will show your `POLICY_AUD` and `TEAM_DOMAIN` values. `TEAM_DOMAIN` can be either your Access team URL or the full `.../cdn-cgi/access/certs` URL. **You must set these as secrets for your Worker.**
-3. **Set up Email Routing** -- In the Cloudflare dashboard, go to your domain > Email Routing and create a catch-all rule that forwards to this Worker
-4. **Enable Email Service** -- The worker needs the `send_email` binding to send outbound emails. See [Email Service docs](https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/)
-5. **Create a mailbox** -- Visit your deployed app and create a mailbox for any address on your domain (e.g. `hello@example.com`)
-
-### Troubleshooting Access
-
-1. If you see `Invalid or expired Access token`, that usually means `POLICY_AUD` or `TEAM_DOMAIN` secrets are incorrect.
-   * Resolution: [turn Access off and back on for the Worker to get the Access modal again](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/), then reset your Worker secrets to the latest `POLICY_AUD` and `TEAM_DOMAIN` values shown there.
-2. If you see `Cloudflare Access must be configured in production`, this application is intentionally enforcing Cloudflare Access so your inbox is not exposed to anyone on the internet.
-   * Resolution: enable Access using [one-click Cloudflare Access for Workers](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/), then set the `POLICY_AUD` and `TEAM_DOMAIN` Worker secrets from the modal values.
-
-## Features
-
-- **Full email client** — Send and receive emails via Cloudflare Email Routing with a rich text composer, reply/forward threading, folder organization, search, and attachments
-- **Per-mailbox isolation** — Each mailbox runs in its own Durable Object with SQLite storage and R2 for attachments
-- **Built-in AI agent** — Side panel with 9 email tools for reading, searching, drafting, and sending
-- **Auto-draft on new email** — Agent automatically reads inbound emails and generates draft replies, always requiring explicit confirmation before sending
-- **Configurable and persistent** — Custom system prompts per mailbox, persistent chat history, streaming markdown responses, and tool call visibility
-
-## Stack
-
-- **Frontend:** React 19, React Router v7, Tailwind CSS, Zustand, TipTap, `@cloudflare/kumo`
-- **Backend:** Hono, Cloudflare Workers, Durable Objects (SQLite), R2, Email Routing
-- **AI Agent:** Cloudflare Agents SDK (`AIChatAgent`), AI SDK v6, Workers AI (`@cf/moonshotai/kimi-k2.5`), `react-markdown` + `remark-gfm`
-- **Auth:** Cloudflare Access JWT validation (required outside local development)
-
-## Getting Started
-
-```bash
-npm install
+```sh
+npm ci
 npm run dev
 ```
 
-### Configuration
+Vite disables remote bindings for local development. Local mail tests do not send real messages. Set the local Worker `DOMAINS` binding to comma-separated test domains through your normal local configuration process. Do not commit real credentials. An empty domain list accepts no mail.
 
-1. Set your domain in `wrangler.jsonc`
-2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
-
-### Deploy
-
-```bash
-npm run deploy
+```sh
+npm test
+npm run typecheck
+npm run build
 ```
 
-## Prerequisites
+The test suite bundles actual Worker source and executes mailbox persistence with SQLite. It controls the external R2/provider boundaries. These tests do not prove a live Cloudflare account can receive or send.
 
-- Cloudflare account with a domain
-- [Email Routing](https://developers.cloudflare.com/email-routing/) enabled for receiving
-- [Email Service](https://developers.cloudflare.com/email-service/) enabled for sending
-- [Workers AI](https://developers.cloudflare.com/workers-ai/) enabled (for the agent)
-- [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) configured for deployed/shared environments (required in production)
+## Mail behavior
 
-Any user who passes the shared Cloudflare Access policy can access all mailboxes in this app by design. This includes the MCP server at `/mcp` -- external AI tools (Claude Code, Cursor, etc.) connected via MCP can operate on any mailbox by passing a `mailboxId` parameter. There is no per-mailbox authorization; the Cloudflare Access policy is the single trust boundary.
+Each domain's catch-all routing must point to the deployed Worker. The SMTP envelope receiving address selects the mailbox; the visible To header does not control routing. New addresses require no prior mailbox setup. The application checks the configured domains before saving mail.
 
-## Architecture
+Incoming raw `.eml` messages are stored in R2 before parsing. A digest of the exact receiving address and raw mail identifies a delivery. Identical retries for that address do not duplicate it, and delivery to a second address remains a separate mailbox record.
 
-```
-┌──────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Browser    │────>│  Hono Worker     │────>│  MailboxDO      │
-│  React SPA   │     │  (API + SSR)     │     │  (SQLite + R2)  │
-│  Agent Panel │     │                  │     └─────────────────┘
-└──────┬───────┘     │  /agents/* ──────┼────>┌─────────────────┐
-       │             │                  │     │  EmailAgent DO  │
-       │ WebSocket   │                  │     │  (AIChatAgent)  │
-       └─────────────┤                  │     │  9 email tools  │
-                     │                  │────>│  Workers AI     │
-                     └──────────────────┘     └─────────────────┘
-```
+Replies retain the mailbox From identity. New outbound attempts are saved in Drafts with `pending` status before the provider is called. Provider acceptance moves them to Sent with `accepted` status and records the provider Message-ID. An error or interruption retains an unconfirmed copy for recovery. Reusing the same operation ID never automatically sends again; using it with altered content is rejected.
 
-## License
+An unconfirmed attempt may already have reached the provider. Check before creating a replacement message. Provider acceptance is not proof of recipient delivery.
 
-Apache 2.0 -- see [LICENSE](LICENSE).
+## Production activation
+
+Production remains unconfigured until account and domain qualification is complete.
+
+1. Keep the existing forwarding in place during preparation.
+2. Provision this project's isolated Worker, Durable Object namespace and R2 bucket.
+3. Configure an owner-only Cloudflare Access policy. Production refuses HTTP access without valid Access configuration and identity.
+4. Configure the 11 owned domains and onboard each required sending domain. Cloudflare Email Sending has its own plan, enrollment, quota and message-size limits.
+5. Qualify one domain with new direct, CC and BCC mail, attachments, read/reopen and an exact-address reply observed in an independent inbox.
+6. Verify provider failures and recoverable stored content, then authorize and verify the remaining routing cutover.
+
+The upstream Wrangler file is a template, not evidence that an account is configured. No app release or DNS/routing change occurs from the CI workflow.
+
+Optional AI requires an explicit `AI_ENABLED=true` binding and separate privacy/provider qualification. The default does not process mail with AI or expose the upstream agent/MCP endpoints.
+
+See [PROJECT_STATUS.md](PROJECT_STATUS.md) for implementation and verification limits.

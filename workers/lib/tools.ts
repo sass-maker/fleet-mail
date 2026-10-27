@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -27,7 +28,7 @@ import {
 	buildThreadingHeaders,
 } from "./email-helpers";
 import { verifyDraft } from "./ai";
-import { sendEmail } from "../email-sender";
+import { sendOutgoing } from "./outbound";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 
@@ -390,142 +391,20 @@ export async function toolDeleteEmail(
 
 // ── send_reply ─────────────────────────────────────────────────────
 
-export async function toolSendReply(
-	env: Env,
-	mailboxId: string,
-	params: {
-		originalEmailId: string;
-		to: string;
-		subject: string;
-		bodyHtml: string;
-	},
-): Promise<
-	| { status: "sent"; messageId: string; message: string }
-	| { error: string }
-> {
-	const stub = getMailboxStub(env, mailboxId);
-
-	// Check send rate limit
-	const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
-	if (rateLimitError) {
-		return { error: rateLimitError };
-	}
-
-	const originalEmail = (await stub.getEmail(params.originalEmailId)) as EmailFull | null;
-	if (!originalEmail) {
-		return { error: "Original email not found" };
-	}
-
-	const { originalMsgId, references, threadId } = buildReferencesChain(originalEmail);
-	const fromDomain = mailboxId.split("@")[1];
-	if (!fromDomain) throw new Error("Invalid mailbox email address");
-	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
-
-	// Verify and append quoted original message
-	const sanitizedBody = await verifyDraft(env.AI, params.bodyHtml);
-	if (!sanitizedBody) {
-		return { error: "Draft verification failed — refusing to send unverified content. Please try again." };
-	}
-	const quotedBlock = buildQuotedReplyBlock({
-		date: originalEmail.date,
-		sender: originalEmail.sender || params.to,
-		body: originalEmail.body ?? undefined,
-	});
-	const fullBodyHtml = sanitizedBody + quotedBlock;
-
-	try {
-		await sendEmail(env.EMAIL, {
-			to: params.to,
-			from: mailboxId,
-			subject: params.subject,
-			html: fullBodyHtml,
-			headers: buildThreadingHeaders(originalMsgId, references),
-		});
-	} catch (e) {
-		console.error("Email send failed:", (e as Error).message);
-		return { error: `Failed to send reply: ${(e as Error).message}` };
-	}
-
-	await stub.createEmail(
-		Folders.SENT,
-		{
-			id: messageId,
-			subject: params.subject,
-			sender: mailboxId.toLowerCase(),
-			recipient: params.to.toLowerCase(),
-			date: new Date().toISOString(),
-			body: fullBodyHtml,
-			in_reply_to: originalMsgId,
-			email_references:
-				references.length > 0 ? JSON.stringify(references) : null,
-			thread_id: threadId,
-			message_id: outgoingMessageId,
-		},
-		[],
-	);
-
-	return { status: "sent", messageId, message: `Reply sent to ${params.to}` };
+export async function toolSendReply(env: Env, mailboxId: string, params: { originalEmailId: string; to: string; subject: string; bodyHtml: string }) {
+ const stub = getMailboxStub(env, mailboxId);
+ const original = await stub.getEmail(params.originalEmailId) as EmailFull | null;
+ if (!original) return { error: "Original email not found" };
+ const chain = buildReferencesChain(original);
+ try {
+  const result = await sendOutgoing(env, mailboxId, { to: params.to, from: mailboxId, subject: params.subject, html: params.bodyHtml, in_reply_to: chain.originalMsgId, references: chain.references, thread_id: chain.threadId });
+  return { ...result, messageId: result.id, message: "Reply accepted by the sending provider" };
+ } catch (error) { return { error: `Failed to send reply: ${(error as Error).message}` }; }
 }
 
-// ── send_email ─────────────────────────────────────────────────────
-
-export async function toolSendEmail(
-	env: Env,
-	mailboxId: string,
-	params: {
-		to: string;
-		subject: string;
-		bodyHtml: string;
-	},
-): Promise<
-	| { status: "sent"; messageId: string; message: string }
-	| { error: string }
-> {
-	const stub = getMailboxStub(env, mailboxId);
-
-	// Check send rate limit
-	const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
-	if (rateLimitError) {
-		return { error: rateLimitError };
-	}
-
-	const fromDomain = mailboxId.split("@")[1];
-	if (!fromDomain) throw new Error("Invalid mailbox email address");
-	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
-
-	const sanitizedBody = await verifyDraft(env.AI, params.bodyHtml);
-	if (!sanitizedBody) {
-		return { error: "Draft verification failed — refusing to send unverified content. Please try again." };
-	}
-
-	try {
-		await sendEmail(env.EMAIL, {
-			to: params.to,
-			from: mailboxId,
-			subject: params.subject,
-			html: sanitizedBody,
-		});
-	} catch (e) {
-		console.error("Email send failed:", (e as Error).message);
-		return { error: `Failed to send email: ${(e as Error).message}` };
-	}
-
-	await stub.createEmail(
-		Folders.SENT,
-		{
-			id: messageId,
-			subject: params.subject,
-			sender: mailboxId.toLowerCase(),
-			recipient: params.to.toLowerCase(),
-			date: new Date().toISOString(),
-			body: sanitizedBody,
-			in_reply_to: null,
-			email_references: null,
-			thread_id: messageId,
-			message_id: outgoingMessageId,
-		},
-		[],
-	);
-
-	return { status: "sent", messageId, message: `Email sent to ${params.to}` };
+export async function toolSendEmail(env: Env, mailboxId: string, params: { to: string; subject: string; bodyHtml: string }) {
+ try {
+  const result = await sendOutgoing(env, mailboxId, { to: params.to, from: mailboxId, subject: params.subject, html: params.bodyHtml });
+  return { ...result, messageId: result.id, message: "Email accepted by the sending provider" };
+ } catch (error) { return { error: `Failed to send email: ${(error as Error).message}` }; }
 }

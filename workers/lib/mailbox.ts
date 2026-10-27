@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -21,7 +22,7 @@ export type MailboxContext = {
 export const requireMailbox = createMiddleware<MailboxContext>(async (c, next) => {
 	const rawId = c.req.param("mailboxId");
 	if (!rawId) return c.json({ error: "Mailbox ID required" }, 400);
-	const mailboxId = decodeURIComponent(rawId);
+	const mailboxId = rawId;
 
 	// Verify mailbox exists
 	const key = `mailboxes/${mailboxId}.json`;

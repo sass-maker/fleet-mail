@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -29,6 +30,8 @@ export const emails = sqliteTable("emails", {
 	thread_id: text("thread_id"),
 	message_id: text("message_id"),
 	raw_headers: text("raw_headers"),
+	delivery_status: text("delivery_status"),
+	delivery_fingerprint: text("delivery_fingerprint"),
 });
 
 export const attachments = sqliteTable("attachments", {

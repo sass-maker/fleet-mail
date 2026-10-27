@@ -1,3 +1,4 @@
+// Modified for Domain Inbox, 2026-10-27.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -97,38 +98,38 @@ interface EmailListResponse {
 const api = {
 	// Config
 	getConfig: () =>
-		get<{ domains: string[]; emailAddresses: string[] }>("/api/v1/config"),
+		get<{ domains: string[]; emailAddresses: string[]; aiEnabled: boolean }>("/api/v1/config"),
 
 	// Mailboxes
 	listMailboxes: () => get<Mailbox[]>("/api/v1/mailboxes"),
 	createMailbox: (email: string, name: string, settings?: unknown) =>
 		post<Mailbox>("/api/v1/mailboxes", { email, name, settings }),
 	getMailbox: (mailboxId: string) =>
-		get<Mailbox>(`/api/v1/mailboxes/${mailboxId}`),
+		get<Mailbox>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}`),
 	updateMailbox: (mailboxId: string, settings: unknown) =>
-		put<Mailbox>(`/api/v1/mailboxes/${mailboxId}`, { settings }),
+		put<Mailbox>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}`, { settings }),
 	deleteMailbox: (mailboxId: string) =>
-		del<void>(`/api/v1/mailboxes/${mailboxId}`),
+		del<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}`),
 
 	// Emails
 	listEmails: (mailboxId: string, params: Record<string, string>, opts?: { signal?: AbortSignal }) =>
-		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${mailboxId}/emails`, { params, signal: opts?.signal }),
+		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails`, { params, signal: opts?.signal }),
 	sendEmail: (mailboxId: string, email: unknown) =>
-		post<void>(`/api/v1/mailboxes/${mailboxId}/emails`, email),
+		post<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails`, email),
 	getEmail: (mailboxId: string, id: string, opts?: { signal?: AbortSignal }) =>
-		get<Email>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`, { signal: opts?.signal }),
+		get<Email>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${id}`, { signal: opts?.signal }),
 	updateEmail: (mailboxId: string, id: string, data: unknown) =>
-		put<Email>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`, data),
+		put<Email>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${id}`, data),
 	deleteEmail: (mailboxId: string, id: string) =>
-		del<void>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`),
+		del<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${id}`),
 	moveEmail: (mailboxId: string, id: string, folderId: string) =>
-		post<void>(`/api/v1/mailboxes/${mailboxId}/emails/${id}/move`, { folderId }),
+		post<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${id}/move`, { folderId }),
 	getThread: (mailboxId: string, threadId: string, opts?: { signal?: AbortSignal }) =>
-		get<Email[]>(`/api/v1/mailboxes/${mailboxId}/threads/${threadId}`, { signal: opts?.signal }),
+		get<Email[]>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/threads/${threadId}`, { signal: opts?.signal }),
 	markThreadRead: (mailboxId: string, threadId: string) =>
-		post<void>(`/api/v1/mailboxes/${mailboxId}/threads/${threadId}/read`),
+		post<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/threads/${threadId}/read`),
 	getAttachment: (mailboxId: string, emailId: string, attachmentId: string) =>
-		get<Blob>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${attachmentId}`, { responseType: "blob" }),
+		get<Blob>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${emailId}/attachments/${attachmentId}`, { responseType: "blob" }),
 	saveDraft: (
 		mailboxId: string,
 		draft: {
@@ -141,25 +142,25 @@ const api = {
 			thread_id?: string;
 			draft_id?: string;
 		},
-	) => post<{ draft_id: string }>(`/api/v1/mailboxes/${mailboxId}/drafts`, draft),
+	) => post<{ draft_id: string }>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/drafts`, draft),
 	replyToEmail: (mailboxId: string, emailId: string, email: unknown) =>
-		post<void>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/reply`, email),
+		post<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${emailId}/reply`, email),
 	forwardEmail: (mailboxId: string, emailId: string, email: unknown) =>
-		post<void>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/forward`, email),
+		post<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/emails/${emailId}/forward`, email),
 
 	// Folders
 	listFolders: (mailboxId: string) =>
-		get<Folder[]>(`/api/v1/mailboxes/${mailboxId}/folders`),
+		get<Folder[]>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/folders`),
 	createFolder: (mailboxId: string, name: string) =>
-		post<Folder>(`/api/v1/mailboxes/${mailboxId}/folders`, { name }),
+		post<Folder>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/folders`, { name }),
 	updateFolder: (mailboxId: string, id: string, name: string) =>
-		put<Folder>(`/api/v1/mailboxes/${mailboxId}/folders/${id}`, { name }),
+		put<Folder>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/folders/${id}`, { name }),
 	deleteFolder: (mailboxId: string, id: string) =>
-		del<void>(`/api/v1/mailboxes/${mailboxId}/folders/${id}`),
+		del<void>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/folders/${id}`),
 
 	// Search
 	searchEmails: (mailboxId: string, params: Record<string, string>) =>
-		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${mailboxId}/search`, { params }),
+		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/search`, { params }),
 };
 
 export default api;
