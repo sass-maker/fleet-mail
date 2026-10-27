@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { domainFilterHref } from './domain-filter.ts';
+import { clearAddressFilterHref, domainFilterHref } from './domain-filter.ts';
+
+test('old address links keep their conversation, page and other filters', () => {
+	assert.equal(
+		clearAddressFilterHref(new URL('https://mail.example/inbox?address=old&thread=message&page=2&q=invoice')),
+		'/inbox?thread=message&page=2&q=invoice'
+	);
+});
 
 test('domain selection includes unregistered recipients by removing stale address scope', () => {
 	const current = new URL('https://mail.example/inbox?address=team-id&thread=old&page=4&q=invoice&unread=1');
