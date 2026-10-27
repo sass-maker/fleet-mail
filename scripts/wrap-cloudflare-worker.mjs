@@ -14,6 +14,16 @@ const LEGACY_MARKER = '__QUICKMAIL_EMAIL_WRAPPER__';
 const generated = path.resolve('.svelte-kit/cloudflare/_worker.js');
 const sveltekit = path.resolve('.svelte-kit/cloudflare/_sveltekit.js');
 
+// Type the generated framework boundary so checkJs never re-checks compiled
+// Svelte internals when checking a checkout that has already been built.
+await writeFile(path.resolve('.svelte-kit/cloudflare/_sveltekit.d.ts'), `
+import type { ExecutionContext } from '@cloudflare/workers-types';
+declare const worker: {
+	fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> | Response;
+};
+export default worker;
+`);
+
 if (!existsSync(generated)) {
 	throw new Error('Expected .svelte-kit/cloudflare/_worker.js after `vite build`.');
 }

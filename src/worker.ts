@@ -5,7 +5,7 @@ import {
 	type CloudflareInboundMessage
 } from './lib/server/cloudflare-inbound';
 // Renamed from `_worker.js` by `scripts/wrap-cloudflare-worker.mjs` after `vite build`.
-// @ts-expect-error file is created at build time
+// @ts-ignore Framework output exists after build; its fetch contract is typed below.
 import sveltekit from '../.svelte-kit/cloudflare/_sveltekit.js';
 
 type SvelteKitWorker = {

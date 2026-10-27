@@ -25,4 +25,5 @@ jobs:
       - run: pnpm test
       - run: pnpm run test:owner-access
       - run: pnpm run build
+      - run: pnpm run check
       - run: pnpm exec wrangler deploy --dry-run

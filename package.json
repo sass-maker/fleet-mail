@@ -22,7 +22,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"test:owner-access": "node --test src/lib/server/owner-access.test.ts scripts/provision-owner.test.mjs",
-		"verify": "pnpm run check:clean && pnpm run check && pnpm test && pnpm run test:owner-access && pnpm run build && wrangler deploy --dry-run",
+		"verify": "pnpm run check:clean && pnpm run check && pnpm test && pnpm run test:owner-access && pnpm run build && pnpm run check && wrangler deploy --dry-run",
 		"check:clean": "node scripts/check-template-clean.mjs --deployment",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"cf-typegen": "wrangler types --include-runtime=false --strict-vars=false",
