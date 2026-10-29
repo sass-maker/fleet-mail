@@ -4,7 +4,7 @@
 One private inbox for new catch-all mail across the owner's 11 domains, with replies from the exact receiving address.
 
 ## Source
-Stock Quickinbox at `bae9da459b68aa6164ed4e5c84a452b7423c277a`, retaining its UI and MIT license. The previous Agentic Inbox prototype is preserved on its own branch and draft PR.
+Stock Quickinbox at `bae9da459b68aa6164ed4e5c84a452b7423c277a`, retaining its UI and MIT license. The superseded Agentic Inbox prototype's PR is closed; its complete Git history is retained in an owner-local recovery bundle.
 
 ## Scope
 Cloudflare Workers, D1, R2 and Email Service. Single-owner Cloudflare Access email-code login. New mail only; no historical personal-inbox import.
