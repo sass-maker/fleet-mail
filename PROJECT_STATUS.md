@@ -23,5 +23,8 @@ Cloudflare Access protects this custom domain and the original Workers hostname 
 
 Dedicated Worker `fleet-mail`, D1 `fleet-mail`, R2 `fleet-mail-attachments`. All 11 domain catch-all rules now invoke `fleet-mail`; they no longer forward directly to personal Gmail. The prior forwarding rules are retained in owner-local rollback snapshots. Domain sending is enabled for all 11 domains. Password/setup/pairing, API-token and MCP login paths stay closed; Access is the sole HTTP login.
 
+## Local agent connection — 2026-11-06
+`cli/fleet-mcp.ts` connects a local Codex stdio MCP server to the existing REST API with the owner's Cloudflare Access session. It reuses the CLI mail tools and adds sending-identity discovery. It does not enable hosted MCP/OAuth, change catch-all rules, or run automatic replies. Mail send/reply delivery through this new connection has not been exercised.
+
 ## Next
 Use the domain-filtered inbox. Per-address inbox navigation and historical mail migration are outside the owner's current scope.

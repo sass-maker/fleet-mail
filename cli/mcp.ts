@@ -45,15 +45,14 @@ function fail(error: unknown) {
  * with the host). Each tool takes an optional `account`; read-only listings fan
  * out to every account when it is omitted so several inboxes can be worked at once.
  */
+export type McpAccounts = { accounts: AccountClient[]; defaultName: string };
+
 class Accounts {
 	readonly all: AccountClient[];
 	readonly defaultName: string;
 
-	constructor(accounts: { name: string; url: string; token: string }[], defaultName: string) {
-		this.all = accounts.map((account) => ({
-			name: account.name,
-			client: new QuickInboxClient(account.url, account.token)
-		}));
+	constructor(accounts: AccountClient[], defaultName: string) {
+		this.all = accounts;
 		this.defaultName = defaultName;
 	}
 
@@ -123,19 +122,32 @@ const idLookupHint = (accounts: Accounts) =>
 		? ' When `account` is omitted, every account is checked for the id (default account first) and the owning account is returned as "account".'
 		: '';
 
-export async function startMcpServer(): Promise<void> {
-	const loaded = await loadAccounts();
-	if (loaded.accounts.length === 0 || !loaded.defaultName) {
-		throw new Error(
-			'Not logged in. Run `quickinbox login --url <instance> --token <key>` or set QUICKINBOX_URL and QUICKINBOX_TOKEN.'
-		);
-	}
-	const accounts = new Accounts(loaded.accounts, loaded.defaultName);
+export function createMcpServer(configured: McpAccounts): McpServer {
+	const accounts = new Accounts(configured.accounts, configured.defaultName);
 	const multi = accounts.all.length > 1;
 
 	const server = new McpServer(
 		{ name: 'quickinbox', version: '1.1.0' },
-		{ instructions: UNTRUSTED_CONTENT }
+		{ instructions: `${UNTRUSTED_CONTENT} Send, reply, and change mail only when the user requests that action. Never automatically reply to incoming mail.` }
+	);
+
+	server.registerTool(
+		'list_addresses',
+		{
+			description: 'List the authenticated user\'s sending identities. Use an address id as fromAddressId when composing. Replies use the original receiving address by default.',
+			annotations: { readOnlyHint: true },
+			inputSchema: { account: accountArgForListing(accounts) }
+		},
+		async ({ account }) => {
+			try {
+				const rows = await Promise.all(accounts.many(account).map(async ({ name, client }) => ({
+					account: name, addresses: await client.listAddresses()
+				})));
+				return textResult({ accounts: rows });
+			} catch (error) {
+				return fail(error);
+			}
+		}
 	);
 
 	server.registerTool(
@@ -453,6 +465,21 @@ export async function startMcpServer(): Promise<void> {
 		}
 	);
 
-	const transport = new StdioServerTransport();
-	await server.connect(transport);
+	return server;
+}
+
+export async function startMcpServer(configured?: McpAccounts): Promise<void> {
+	if (!configured) {
+		const loaded = await loadAccounts();
+		if (loaded.accounts.length === 0 || !loaded.defaultName) {
+			throw new Error(
+				'Not logged in. Run `quickinbox login --url <instance> --token <key>` or set QUICKINBOX_URL and QUICKINBOX_TOKEN.'
+			);
+		}
+		configured = {
+			accounts: loaded.accounts.map(({ name, url, token }) => ({ name, client: new QuickInboxClient(url, token) })),
+			defaultName: loaded.defaultName
+		};
+	}
+	await createMcpServer(configured).connect(new StdioServerTransport());
 }

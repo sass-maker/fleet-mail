@@ -109,27 +109,77 @@ function idempotencyHeaders(key: string | undefined): Record<string, string> {
 	return key ? { 'idempotency-key': key } : {};
 }
 
+export type ClientAuthentication = string | {
+	kind: 'cloudflare-access';
+	headers: () => Promise<HeadersInit>;
+};
+
 export class QuickInboxClient {
 	readonly url: string;
 
 	constructor(
 		url: string,
-		readonly token: string
+		private readonly authentication: ClientAuthentication
 	) {
 		this.url = normalizeUrl(url);
 	}
 
+	private accessRequired(): QuickInboxError {
+		return new QuickInboxError(401,
+			`Cloudflare Access sign-in required. Run: cloudflared access login --quiet ${this.url}`);
+	}
+
+	private async fetchResponse(path: string, init: RequestInit = {}): Promise<Response> {
+		const headers = new Headers(init.headers);
+		const access = typeof this.authentication !== 'string';
+		if (access) {
+			headers.delete('authorization');
+			const authentication = new Headers(await this.authentication.headers());
+			const token = authentication.get('cf-access-token');
+			if (!token) throw this.accessRequired();
+			headers.set('cf-access-token', token);
+		} else {
+			headers.set('authorization', `Bearer ${this.authentication}`);
+		}
+		let response: Response;
+		try {
+			response = await fetch(`${this.url}${path}`, {
+				...init,
+				headers,
+				...(access ? { redirect: 'manual' as const, signal: init.signal ?? AbortSignal.timeout(30_000) } : {})
+			});
+		} catch (error) {
+			if (access) {
+				const message = headers.has('idempotency-key')
+					? 'Fleet Mail send outcome is unknown. The message may already have been delivered. Retry sending only with the same idempotency_key.'
+					: 'Fleet Mail request did not complete; its outcome is unknown. Check the current state before retrying.';
+				throw new QuickInboxError(502, message);
+			}
+			throw error;
+		}
+		if (access && ((response.status >= 300 && response.status < 400) ||
+			response.status === 401 || response.status === 403)) {
+			throw this.accessRequired();
+		}
+		return response;
+	}
+
 	async request<T>(path: string, init: RequestInit = {}): Promise<T> {
 		const headers = new Headers(init.headers);
-		headers.set('authorization', `Bearer ${this.token}`);
 		headers.set('accept', 'application/json');
 		if (init.body && !headers.has('content-type')) {
 			headers.set('content-type', 'application/json');
 		}
 
-		const res = await fetch(`${this.url}${path}`, { ...init, headers });
+		const res = await this.fetchResponse(path, { ...init, headers });
 		if (res.headers.get('content-type')?.includes('application/json')) {
-			const body = (await res.json()) as T & { error?: string };
+			let body: T & { error?: string };
+			try {
+				body = await res.json() as T & { error?: string };
+			} catch (error) {
+				if (typeof this.authentication !== 'string') throw new QuickInboxError(502, 'Invalid JSON response from Fleet Mail.');
+				throw error;
+			}
 			if (!res.ok) {
 				throw new QuickInboxError(res.status, body.error ?? res.statusText);
 			}
@@ -138,6 +188,9 @@ export class QuickInboxClient {
 
 		if (!res.ok) {
 			throw new QuickInboxError(res.status, res.statusText);
+		}
+		if (typeof this.authentication !== 'string' && res.status !== 204) {
+			throw new QuickInboxError(502, 'Expected a JSON response from Fleet Mail. Check Cloudflare Access sign-in.');
 		}
 		return undefined as T;
 	}
@@ -240,12 +293,16 @@ export class QuickInboxClient {
 	}
 
 	async downloadAttachment(emailId: string, attachmentId: string): Promise<{ bytes: Uint8Array; filename: string; type: string }> {
-		const res = await fetch(
-			`${this.url}/api/mail/${encodeURIComponent(emailId)}/attachments/${encodeURIComponent(attachmentId)}?download=1`,
-			{ headers: { authorization: `Bearer ${this.token}` } }
+		const res = await this.fetchResponse(
+			`/api/mail/${encodeURIComponent(emailId)}/attachments/${encodeURIComponent(attachmentId)}?download=1`
 		);
 		if (!res.ok) {
 			throw new QuickInboxError(res.status, 'Failed to download attachment');
+		}
+		if (typeof this.authentication !== 'string' &&
+			res.headers.get('content-type')?.includes('text/html') &&
+			!res.headers.has('content-disposition')) {
+			throw this.accessRequired();
 		}
 
 		const disposition = res.headers.get('content-disposition') ?? '';
