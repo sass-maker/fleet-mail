@@ -3,7 +3,7 @@
 Private single-owner deployment of DivinPrince/quickinbox, with its existing UI and MIT license retained.
 
 - Keep upstream behavior; limit changes to the owner's mail workflow and deployment.
-- Cloudflare Access is always the sole HTTP login. Verify its signed JWT, audience, issuer, expiry and exact owner email before exposing any HTTP route. Missing configuration fails closed. Password/setup/pairing, API-key and hosted MCP/OAuth authentication stay closed; verified-owner domain onboarding remains available. The local `cli/fleet-mcp.ts` bridge uses the owner's existing Access session against REST, without a separate login or automatic replies.
+- Cloudflare Access is the sole browser/REST login. Verify its signed JWT, audience, issuer, expiry and exact owner email before exposing browser or REST routes, including `/oauth/authorize`. Only the exact hosted MCP/OAuth machine paths in `ownerMcpMethods` may bypass Access; `/mcp` requires a resource-bound OAuth grant for the configured owner. Missing configuration fails closed. Password/setup/pairing and API-key authentication stay closed; verified-owner domain onboarding remains available. The local `cli/fleet-mcp.ts` bridge continues to use the owner's Access session. No automatic replies.
 - Keep mail private. Do not add AI services, external analytics or notifications unless requested.
 - Use the managed Fleet workspace and pinned pnpm install. Run `pnpm run verify` for changed authentication/deployment behavior. Use `pnpm provision:local` or `pnpm provision:remote` after migrations to provision and verify the sole owner and domain inboxes without replacing stored mail.
 - Do not change domain catch-all rules until storage and owner-only access are qualified. Preserve the previous rules for rollback.

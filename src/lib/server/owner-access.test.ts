@@ -66,11 +66,17 @@ test('closes alternate setup, password, pairing and agent authentication routes'
 	for (const path of ['/setup', '/api/setup', '/api/auth/login', '/api/auth/pair',
 		'/api/auth/pair/start', '/api/auth/pair-codes', '/api/apikeys', '/api/oauth/grants',
 		'/api/%73etup', '/api/auth/%70air-codes', '/api/auth/complete-setup', '/api/admin/users',
-		'/mcp', '/mcp/', '/oauth/authorize',
+		'/mcp', '/mcp/',
 		'/.well-known/oauth-authorization-server']) {
 		assert.equal(ownerAccessRouteBlocked(path, 'POST'), true, path);
 	}
 	assert.equal(ownerAccessRouteBlocked('/api/auth/login', 'DELETE'), false);
+	assert.equal(ownerAccessRouteBlocked('/oauth/authorize', 'GET'), false);
+	assert.equal(ownerAccessRouteBlocked('/oauth/authorize', 'POST'), false);
+	assert.equal(ownerAccessRouteBlocked('/oauth/authorize', 'DELETE'), true);
+	assert.equal(ownerAccessRouteBlocked('/api/oauth/grants', 'GET'), false);
+	assert.equal(ownerAccessRouteBlocked('/api/oauth/grants', 'DELETE'), false);
+	assert.equal(ownerAccessRouteBlocked('/api/oauth/grants', 'POST'), true);
 	assert.equal(ownerAccessRouteBlocked('/api/auth/me', 'GET'), false);
 	assert.equal(ownerAccessRouteBlocked('/onboarding', 'GET'), false);
 	assert.equal(ownerAccessRouteBlocked('/api/domains', 'POST'), false);

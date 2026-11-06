@@ -21,10 +21,13 @@ https://mail.significanthobbies.com
 
 Cloudflare Access protects this custom domain and the original Workers hostname with the same owner-only email-code policy. The custom domain changes the web entry point; all 11 catch-all rules continue to invoke the same `fleet-mail` Worker.
 
-Dedicated Worker `fleet-mail`, D1 `fleet-mail`, R2 `fleet-mail-attachments`. All 11 domain catch-all rules now invoke `fleet-mail`; they no longer forward directly to personal Gmail. The prior forwarding rules are retained in owner-local rollback snapshots. Domain sending is enabled for all 11 domains. Password/setup/pairing, API-token and MCP login paths stay closed; Access is the sole HTTP login.
+Dedicated Worker `fleet-mail`, D1 `fleet-mail`, R2 `fleet-mail-attachments`. All 11 domain catch-all rules invoke `fleet-mail`; the prior forwarding rules are retained in owner-local rollback snapshots. Domain sending is enabled for all 11 domains. Password/setup/pairing and API-token login stay closed. Browser and REST login use Cloudflare Access.
 
 ## Local agent connection — 2026-11-06
-`cli/fleet-mcp.ts` connects a local Codex stdio MCP server to the existing REST API with the owner's Cloudflare Access session. It reuses the CLI mail tools and adds sending-identity discovery. It does not enable hosted MCP/OAuth, change catch-all rules, or run automatic replies. Mail send/reply delivery through this new connection has not been exercised.
+`cli/fleet-mcp.ts` connects a local Codex stdio MCP server to the existing REST API with the owner's Cloudflare Access session. It reuses the CLI mail tools and adds sending-identity discovery. It does not change catch-all rules or run automatic replies. Mail send/reply delivery through this connection has not been exercised.
+
+## Hosted agent connection source — 2026-11-06
+The hosted `/mcp` source uses existing OAuth with an exact machine-route allowlist and resource-bound owner grants. Consent stays behind signed owner-only Access. Hosted sending uses the existing API switch and daily budget. This section describes the source change; production deployment and the ChatGPT connection still need live verification.
 
 ## Next
 Use the domain-filtered inbox. Per-address inbox navigation and historical mail migration are outside the owner's current scope.

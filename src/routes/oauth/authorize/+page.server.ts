@@ -1,7 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { fail, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { readLinkedTokens, resolveLinkedSessions } from '$lib/server/accounts';
 import {
 	getClient,
 	isValidCodeChallenge,
@@ -14,6 +13,7 @@ import {
 	type OAuthScope
 } from '$lib/server/oauth';
 import { loginHref } from '$lib/next-url';
+import { isOwnerMcpUser, ownerMcpOrigin } from '$lib/server/owner-access';
 
 /**
  * The consent screen. GET validates the request and renders it; POST records
@@ -144,9 +144,13 @@ function handleAuthorizeError(origin: string, error: unknown): { code: string; m
 
 export const load: PageServerLoad = async ({ url, locals, platform, fetch, setHeaders }) => {
 	const db = platform?.env.DB;
+	const origin = platform?.env && ownerMcpOrigin(platform.env);
+	if (!origin) throw error(503, 'Owner MCP is not configured');
+	if (origin !== url.origin) throw error(403, 'Invalid MCP origin');
 	if (!locals.user || !db) {
 		throw redirect(303, loginHref(`${url.pathname}${url.search}`));
 	}
+	if (!isOwnerMcpUser(locals.user, platform!.env)) throw error(403, 'Only the verified owner can authorize this mailbox');
 	setHeaders({ 'cache-control': 'no-store' });
 
 	let request: AuthorizeRequest;
@@ -175,11 +179,15 @@ export const load: PageServerLoad = async ({ url, locals, platform, fetch, setHe
 };
 
 export const actions: Actions = {
-	default: async ({ request, url, locals, platform, cookies, fetch }) => {
+	default: async ({ request, url, locals, platform, fetch }) => {
 		const db = platform?.env.DB;
+		const canonicalOrigin = platform?.env && ownerMcpOrigin(platform.env);
+		if (!canonicalOrigin) throw error(503, 'Owner MCP is not configured');
+		if (canonicalOrigin !== url.origin) throw error(403, 'Invalid MCP origin');
 		if (!locals.user || !db) {
 			throw redirect(303, loginHref(`${url.pathname}${url.search}`));
 		}
+		if (!isOwnerMcpUser(locals.user, platform!.env)) throw error(403, 'Only the verified owner can authorize this mailbox');
 
 		// SvelteKit already rejects cross-site form posts in production; the
 		// consent decision is important enough to check again here regardless.
@@ -207,23 +215,16 @@ export const actions: Actions = {
 			);
 		}
 
-		// The person may authorize any account signed in on this browser, not just
-		// the active one — but nothing else.
-		let userId = locals.user.id;
 		const chosen = param(form, 'user_id', 128);
 		if (chosen && chosen !== locals.user.id) {
-			const linked = await resolveLinkedSessions(db, readLinkedTokens(cookies));
-			if (!linked.some((session) => session.user.id === chosen)) {
-				return fail(400, {
-					invalid: { code: 'invalid_request', message: 'That account is not signed in on this browser' }
-				});
-			}
-			userId = chosen;
+			return fail(400, {
+				invalid: { code: 'invalid_request', message: 'Only the verified owner can authorize this mailbox' }
+			});
 		}
 
 		const code = await issueAuthorizationCode(db, {
 			client_id: parsed.client.client_id,
-			user_id: userId,
+			user_id: locals.user.id,
 			redirect_uri: parsed.redirectUri,
 			code_challenge: parsed.codeChallenge,
 			scope: parsed.scope,

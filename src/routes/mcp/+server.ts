@@ -1,17 +1,12 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { RequestHandler } from '@sveltejs/kit';
-import { getUserByApiToken, readBearerToken } from '$lib/server/api-tokens';
+import { readBearerToken } from '$lib/server/api-tokens';
 import { getEmailProvider } from '$lib/server/context';
 import { handleMcpRequest } from '$lib/server/mcp';
-import { bearerChallenge, getUserByOAuthToken } from '$lib/server/oauth';
+import { bearerChallenge, getUserByOAuthToken, mcpResourceUri } from '$lib/server/oauth';
+import { isOwnerMcpUser, ownerMcpOrigin } from '$lib/server/owner-access';
 import { apiSendPolicy } from '$lib/server/send-policy';
 import type { User } from '$lib/types';
-
-/**
- * The hosted MCP endpoint. Authenticates with an OAuth access token issued by
- * this server's `/oauth/*` endpoints — or, for people who already have one, a
- * `qi_live_` API key — then hands the JSON-RPC body to the MCP SDK.
- */
 
 function rpcError(status: number, message: string, headers: Record<string, string> = {}): Response {
 	return new Response(
@@ -20,51 +15,52 @@ function rpcError(status: number, message: string, headers: Record<string, strin
 	);
 }
 
-async function authenticate(
-	db: D1Database,
-	request: Request
-): Promise<{ user: User; scopes: readonly string[] } | null> {
-	const bearer = readBearerToken(request);
-	if (!bearer) return null;
-	const oauth = await getUserByOAuthToken(db, bearer);
-	if (oauth) return { user: oauth.user, scopes: oauth.scopes };
-	const apiToken = await getUserByApiToken(db, bearer);
-	if (apiToken) return { user: apiToken.user, scopes: apiToken.scopes };
-	return null;
-}
+type AuthorizedMcp = { db: D1Database; user: User; scopes: readonly string[]; origin: string };
 
-export const POST: RequestHandler = async ({ request, platform, url }) => {
+async function authenticate({ request, platform, url }: Parameters<RequestHandler>[0]): Promise<AuthorizedMcp | Response> {
 	const db = platform?.env.DB;
-	if (!db) return rpcError(503, 'Database unavailable');
+	const origin = platform?.env && ownerMcpOrigin(platform.env);
+	if (!db || !origin) return rpcError(503, 'Owner MCP is not configured');
+	if (url.origin !== origin) return rpcError(403, 'Invalid MCP origin');
 
 	const bearer = readBearerToken(request);
 	if (!bearer) {
-		return rpcError(401, 'Authorization required', { 'WWW-Authenticate': bearerChallenge(url.origin) });
+		return rpcError(401, 'Authorization required', { 'WWW-Authenticate': bearerChallenge(origin) });
 	}
-	const auth = await authenticate(db, request);
-	if (!auth) {
+	const auth = await getUserByOAuthToken(db, bearer, mcpResourceUri(origin));
+	if (!auth || !isOwnerMcpUser(auth.user, platform!.env)) {
 		return rpcError(401, 'Invalid or expired token', {
-			'WWW-Authenticate': bearerChallenge(url.origin, {
+			'WWW-Authenticate': bearerChallenge(origin, {
 				error: 'invalid_token',
 				description: 'The access token is invalid, expired, or revoked'
 			})
 		});
 	}
+	return { db, user: auth.user, scopes: auth.scopes, origin };
+}
+
+export const POST: RequestHandler = async (event) => {
+	const auth = await authenticate(event);
+	if (auth instanceof Response) return auth;
+	const { request, platform } = event;
 
 	return handleMcpRequest(request, {
-		db,
+		db: auth.db,
 		bucket: platform?.env.ATTACHMENTS,
 		provider: () => getEmailProvider(platform),
 		user: auth.user,
 		scopes: auth.scopes,
-		origin: url.origin,
+		origin: auth.origin,
 		sendPolicy: apiSendPolicy(platform?.env)
 	});
 };
 
 /** Stateless server: no SSE stream to open and no session to end. */
-const methodNotAllowed: RequestHandler = () =>
-	rpcError(405, 'This MCP server is stateless; send JSON-RPC requests with POST', { Allow: 'POST, OPTIONS' });
+const methodNotAllowed: RequestHandler = async (event) => {
+	const auth = await authenticate(event);
+	return auth instanceof Response ? auth :
+		rpcError(405, 'This MCP server is stateless; send JSON-RPC requests with POST', { Allow: 'POST, OPTIONS' });
+};
 
 export const GET = methodNotAllowed;
 export const DELETE = methodNotAllowed;

@@ -2,9 +2,9 @@
 
 This repository deploys Quickinbox for one owner on Cloudflare. Use `pnpm install --frozen-lockfile`, `pnpm run check`, `pnpm test`, and `pnpm run build`. Production uses Cloudflare Access email-code sign-in; the app verifies the signed assertion and opens the pre-provisioned owner account without a second password. Configuration lives in `wrangler.jsonc`.
 
-The upstream Quickinbox UI and MIT license are retained. The reference documentation below describes upstream features; optional AI, notifications, API keys, and hosted MCP/OAuth login are not enabled for this deployment. A local MCP bridge lets Codex use the owner's Access-authenticated mailbox. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for verified scope.
+The upstream Quickinbox UI and MIT license are retained. Optional AI and notifications stay disabled. Owner-authorized MCP supports on-demand mail actions; API-key login remains closed. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for verified scope.
 
-For an empty D1 database, run `pnpm db:migrate:remote` then `pnpm provision:remote` before routing mail to the Worker. The provisioner is idempotent, verifies the configured owner and all domains, preserves existing mail, and refuses a different existing owner. It creates Access-only login and `team@` sending identities; replies to other catch-all addresses use their exact receiving address. Use the corresponding `:local` commands for local storage. Production HTTP always requires verified Cloudflare Access, including when configuration is missing.
+For an empty D1 database, run `pnpm db:migrate:remote` then `pnpm provision:remote` before routing mail to the Worker. The provisioner is idempotent, verifies the configured owner and all domains, preserves existing mail, and refuses a different existing owner. It creates Access-only login and `team@` sending identities; replies to other catch-all addresses use their exact receiving address. Use the corresponding `:local` commands for local storage. Browser/REST routes and OAuth consent require verified Cloudflare Access. Missing owner configuration fails closed on every route, including MCP.
 
 ## Use Fleet Mail in Codex
 
@@ -19,7 +19,15 @@ Restart Codex to load the server. It exposes mailbox search, conversation readin
 
 The bridge reads the cached Access session through `cloudflared access token`, keeps the token out of Codex configuration and output, and refuses login redirects. When the session expires, run the login command again. Set `FLEET_MAIL_CLOUDFLARED` to an absolute executable path when the Codex app's PATH does not include it. Use an absolute Bun path in the registration command for the same reason. `--url https://your-mail-origin` selects another Access-protected Fleet Mail instance.
 
-Access requests retain the owner's browser-session permissions; API-key send-disable and daily-send-budget settings do not apply. The hosted `/mcp` and OAuth endpoints remain closed. Run `pnpm run test:fleet-mcp` for the local transport and MCP contract checks.
+Access requests retain the owner's browser-session permissions; API-key send-disable and daily-send-budget settings do not apply to the local bridge. Run `pnpm run test:fleet-mcp` for the local transport and MCP contract checks.
+
+## Use Fleet Mail in ChatGPT
+
+Add `https://mail.significanthobbies.com/mcp` as a custom MCP server with OAuth authentication. ChatGPT discovers the existing authorization server, then sends you to an Access-protected consent page. Only the configured owner can authorize mail access. No OpenAI API key or local tunnel is required.
+
+The exact machine endpoints permit OAuth discovery, client registration and token exchange. Browser/REST routes and the consent page retain Cloudflare Access. MCP accepts only owner OAuth grants bound to this instance's canonical resource, with the granted read/send scopes. Password, pairing and API-key login remain closed. The OAuth revocation endpoint invalidates an app's token family; owner-authenticated grant management remains available through the existing API.
+
+Hosted sends retain the API send switch and the default 100-send daily limit. There are no automatic replies. Run `pnpm run test:hosted-mcp` for the access boundary, OAuth exchange and tool-contract checks.
 
 ---
 

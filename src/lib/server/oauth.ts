@@ -657,7 +657,7 @@ type GrantRow = {
  */
 export async function refreshGrant(
 	db: D1Database,
-	input: { refreshToken: string; clientId: string; scope?: string | null }
+	input: { refreshToken: string; clientId: string; scope?: string | null; expectedResource?: string; expectedUserId?: string }
 ): Promise<TokenResponse> {
 	if (!input.refreshToken.startsWith(REFRESH_TOKEN_PREFIX) || input.refreshToken.length > MAX_TOKEN_LENGTH) {
 		throw new OAuthError('invalid_grant', 'Unknown refresh token');
@@ -674,11 +674,15 @@ export async function refreshGrant(
 	if (row.client_id !== input.clientId) {
 		throw new OAuthError('invalid_grant', 'Refresh token was issued to a different client');
 	}
+	if ((input.expectedResource && row.resource !== input.expectedResource) ||
+		(input.expectedUserId && row.user_id !== input.expectedUserId)) {
+		throw new OAuthError('invalid_grant', 'Refresh token was issued for a different mailbox or resource');
+	}
 	if (row.revoked_at) {
 		await revokeFamily(db, row.family_id);
 		throw new OAuthError('invalid_grant', 'Refresh token was already used; all tokens for this login were revoked');
 	}
-	if (Date.parse(row.refresh_expires_at) <= Date.now()) {
+	if (!Number.isFinite(Date.parse(row.refresh_expires_at)) || Date.parse(row.refresh_expires_at) <= Date.now()) {
 		throw new OAuthError('invalid_grant', 'Refresh token has expired');
 	}
 
@@ -747,6 +751,7 @@ type TokenUserRow = {
 	grant_id: string;
 	client_id: string;
 	scope: string;
+	resource: string;
 	access_expires_at: string;
 	revoked_at: string | null;
 	last_used_at: string | null;
@@ -759,12 +764,12 @@ type TokenUserRow = {
 };
 
 /** Resolve an MCP bearer token to its user. Null for unknown, expired, or revoked tokens. */
-export async function getUserByOAuthToken(db: D1Database, token: string): Promise<OAuthTokenAuth | null> {
+export async function getUserByOAuthToken(db: D1Database, token: string, expectedResource?: string): Promise<OAuthTokenAuth | null> {
 	if (!token.startsWith(ACCESS_TOKEN_PREFIX) || token.length > MAX_TOKEN_LENGTH) return null;
 	const hash = await hashToken(token);
 	const row = await db
 		.prepare(
-			`SELECT g.id AS grant_id, g.client_id, g.scope, g.access_expires_at, g.revoked_at, g.last_used_at,
+			`SELECT g.id AS grant_id, g.client_id, g.scope, g.resource, g.access_expires_at, g.revoked_at, g.last_used_at,
 			        u.id, u.email, u.name, u.is_admin, u.must_change_password, u.created_at
 			 FROM oauth_grants g JOIN users u ON u.id = g.user_id
 			 WHERE g.access_hash = ?`
@@ -772,7 +777,8 @@ export async function getUserByOAuthToken(db: D1Database, token: string): Promis
 		.bind(hash)
 		.first<TokenUserRow>();
 	if (!row || row.revoked_at || row.must_change_password === 1) return null;
-	if (Date.parse(row.access_expires_at) <= Date.now()) return null;
+	if (expectedResource && row.resource !== expectedResource) return null;
+	if (!Number.isFinite(Date.parse(row.access_expires_at)) || Date.parse(row.access_expires_at) <= Date.now()) return null;
 
 	const lastUsed = row.last_used_at ? Date.parse(row.last_used_at) : 0;
 	if (!lastUsed || Date.now() - lastUsed >= LAST_USED_THROTTLE_MS) {
