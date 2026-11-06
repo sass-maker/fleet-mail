@@ -71,15 +71,18 @@ describe('owner hosted MCP boundary', () => {
 			const { db } = await fixture();
 			const clientId = `https://${kind}.example/client.json`;
 			let calls = 0;
+			let redirectMode: RequestRedirect | undefined;
 			const fetchMetadata = (async (_input, init) => {
 				calls++;
-				assert.equal(init?.redirect, 'manual');
+				redirectMode = init?.redirect;
 				if (kind === 'redirect') return new Response(null, { status: 302, headers: { location: 'https://127.0.0.1/private' } });
 				return Response.json({ client_id: kind === 'mismatch' ? 'https://other.example/client.json' : clientId,
 					redirect_uris: ['https://client.example/callback'], token_endpoint_auth_method: 'private_key_jwt',
 					token_endpoint_auth_methods_supported: kind === 'private-only' ? ['private_key_jwt'] : ['none'] });
 			}) as typeof fetch;
-			await assert.rejects(getClient(db, clientId, fetchMetadata));
+			const reason = kind === 'redirect' ? /unavailable/ : kind === 'mismatch' ? /does not match/ : /Only public clients/;
+			await assert.rejects(getClient(db, clientId, fetchMetadata), reason);
+			assert.equal(redirectMode, 'manual');
 			assert.equal(calls, 1);
 		}
 	});
