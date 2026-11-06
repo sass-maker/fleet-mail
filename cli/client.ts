@@ -150,9 +150,9 @@ export class QuickInboxClient {
 			});
 		} catch (error) {
 			if (access) {
-				const message = ['GET', 'HEAD', 'OPTIONS'].includes((init.method ?? 'GET').toUpperCase())
-					? 'Fleet Mail request failed. Check the connection before retrying.'
-					: 'Fleet Mail request did not complete; its outcome is unknown. A send or reply may already have been delivered. Retry sending only with the same idempotency_key.';
+				const message = headers.has('idempotency-key')
+					? 'Fleet Mail send outcome is unknown. The message may already have been delivered. Retry sending only with the same idempotency_key.'
+					: 'Fleet Mail request did not complete; its outcome is unknown. Check the current state before retrying.';
 				throw new QuickInboxError(502, message);
 			}
 			throw error;

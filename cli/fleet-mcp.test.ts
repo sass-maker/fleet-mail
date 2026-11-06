@@ -94,7 +94,7 @@ describe('Fleet Mail Access authentication', () => {
 		} finally { globalThis.fetch = originalFetch; }
 	});
 
-	test('does not retry a failed send or expose network error details', async () => {
+	test('does not retry failed requests or expose network error details', async () => {
 		const originalFetch = globalThis.fetch;
 		let attempts = 0;
 		globalThis.fetch = async () => {
@@ -108,6 +108,10 @@ describe('Fleet Mail Access authentication', () => {
 					/may already have been/.test(error.message) && /same idempotency_key/.test(error.message) &&
 					!error.message.includes('private-session-token'));
 			assert.equal(attempts, 1);
+			await assert.rejects(client.updateThread('message-id', { archived: true }),
+				(error: unknown) => error instanceof Error && /outcome is unknown/.test(error.message) &&
+					!/delivered|idempotency_key|private-session-token/.test(error.message));
+			assert.equal(attempts, 2);
 		} finally { globalThis.fetch = originalFetch; }
 	});
 });
