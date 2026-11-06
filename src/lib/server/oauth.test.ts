@@ -175,15 +175,16 @@ describe('discovery', () => {
 });
 
 describe('consent page helpers', () => {
-	test('recognises well-known clients from attributable hosts, not names', () => {
+	test('recognises the selected callback, not names or client sites', () => {
 		assert.equal(clientBrand({ client_name: 'Claude' }), null);
-		assert.equal(clientBrand({ client_name: 'Not Claude', client_uri: 'https://claude.ai' })?.icon, 'claude-fill');
+		assert.equal(clientBrand({ client_name: 'Not Claude', redirect_uri: 'https://claude.ai/callback' })?.icon, 'claude-fill');
 		assert.equal(clientBrand({ client_name: 'Claude', client_uri: 'https://evil.example' }), null);
-		assert.equal(clientBrand({ client_name: 'My tool', client_uri: 'https://cursor.com' })?.icon, 'cursor-ai-fill');
+		assert.equal(clientBrand({ client_name: 'My tool', redirect_uri: 'https://cursor.com/callback' })?.icon, 'cursor-ai-fill');
 		assert.equal(
 			clientBrand({
 				client_name: 'ChatGPT',
-				client_id: 'https://chatgpt.com/.well-known/oauth-client'
+				client_id: 'https://chatgpt.com/.well-known/oauth-client',
+				redirect_uri: 'https://chatgpt.com/connector_platform/oauth/callback'
 			})?.icon,
 			'openai-fill'
 		);

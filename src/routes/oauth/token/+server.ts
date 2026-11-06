@@ -1,5 +1,6 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { checkRateLimit } from '$lib/server/auth';
+import { checkRateLimit, getUserByEmail } from '$lib/server/auth';
+import { isOwnerMcpUser, ownerMcpOrigin } from '$lib/server/owner-access';
 import {
 	consumeAuthorizationCode,
 	deleteExpiredCodes,
@@ -33,6 +34,14 @@ async function readParams(request: Request): Promise<Record<string, string>> {
 export const POST: RequestHandler = async ({ request, platform, url, getClientAddress }) => {
 	const db = platform?.env.DB;
 	if (!db) return json({ error: 'server_error', error_description: 'Database unavailable' }, { status: 503 });
+	const origin = platform?.env && ownerMcpOrigin(platform.env);
+	if (!origin) return json({ error: 'server_error', error_description: 'Owner MCP is not configured' }, { status: 503, headers: NO_STORE });
+	if (url.origin !== origin) return json({ error: 'invalid_target' }, { status: 403, headers: NO_STORE });
+	const owner = await getUserByEmail(db, platform!.env.ACCESS_OWNER_EMAIL!.trim().toLowerCase());
+	if (!owner || !isOwnerMcpUser(owner, platform!.env)) {
+		return json({ error: 'server_error', error_description: 'Owner account is not provisioned' }, { status: 503, headers: NO_STORE });
+	}
+	const resource = mcpResourceUri(origin);
 
 	const ip = request.headers.get('cf-connecting-ip') ?? getClientAddress();
 	if (!(await checkRateLimit(db, `oauth-token:${ip}`, 120, 60))) {
@@ -43,6 +52,7 @@ export const POST: RequestHandler = async ({ request, platform, url, getClientAd
 	try {
 		const clientId = params.client_id?.trim();
 		if (!clientId) throw new OAuthError('invalid_client', 'client_id is required', 401);
+		if (params.resource && params.resource !== resource) throw new OAuthError('invalid_target', 'Incorrect MCP resource');
 
 		switch (params.grant_type) {
 			case 'authorization_code': {
@@ -52,6 +62,9 @@ export const POST: RequestHandler = async ({ request, platform, url, getClientAd
 				}
 				const code = await consumeAuthorizationCode(db, params.code);
 				if (!code) throw new OAuthError('invalid_grant', 'Authorization code is invalid or expired');
+				if (code.resource !== resource || code.user_id !== owner.id) {
+					throw new OAuthError('invalid_grant', 'Authorization code was issued for a different mailbox or resource');
+				}
 				if (code.client_id !== clientId) {
 					throw new OAuthError('invalid_grant', 'Authorization code was issued to a different client');
 				}
@@ -79,7 +92,9 @@ export const POST: RequestHandler = async ({ request, platform, url, getClientAd
 				const tokens = await refreshGrant(db, {
 					refreshToken: params.refresh_token,
 					clientId,
-					scope: params.scope
+					scope: params.scope,
+					expectedResource: resource,
+					expectedUserId: owner.id
 				});
 				return json(tokens, { headers: NO_STORE });
 			}

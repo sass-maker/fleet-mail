@@ -20,7 +20,7 @@ import {
 } from '$lib/server/constants';
 import { listAddressesForUser, listDomains } from '$lib/server/domains';
 import { loginHref, safeNextPath } from '$lib/next-url';
-import { ownerAccessOriginAllowed, ownerAccessRouteBlocked, verifyOwnerAccess } from '$lib/server/owner-access';
+import { ownerAccessOriginAllowed, ownerAccessRouteBlocked, ownerMcpMethods, ownerMcpOrigin, verifyOwnerAccess } from '$lib/server/owner-access';
 import { getUserLocale } from '$lib/server/locale';
 import { getUserUiTheme } from '$lib/server/ui-theme';
 import { BUILTIN_THEME_IDS, DEFAULT_UI_THEME, parseThemeId } from '$lib/ui-theme/ids';
@@ -44,19 +44,6 @@ const PUBLIC_PREFIXES = [
 
 function isPublicPath(pathname: string): boolean {
 	return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-}
-
-/**
- * The hosted MCP endpoint and its OAuth server. Called by AI clients, not
- * browsers: they authenticate with bearer tokens inside the route, need CORS
- * for browser-based clients, and must never be bounced to the login page.
- * `/oauth/authorize` is deliberately absent — that is the consent page and
- * uses the normal session flow.
- */
-const MCP_PREFIXES = ['/mcp', '/oauth/register', '/oauth/token', '/oauth/revoke', '/.well-known/oauth-'];
-
-function isMcpPath(pathname: string): boolean {
-	return MCP_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
 }
 
 function corsHeaders(request: Request): Record<string, string> {
@@ -130,6 +117,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 		matchLocale(event.cookies.get(LOCALE_COOKIE)) ??
 		localeFromAcceptLanguage(event.request.headers.get('accept-language'));
 
+	const mcpMethods = ownerMcpMethods(pathname);
+	if (mcpMethods) {
+		const origin = event.platform?.env && ownerMcpOrigin(event.platform.env);
+		if (!origin || !db) return jsonError('Owner MCP is not configured', 503);
+		if (event.url.origin !== origin) return jsonError('Invalid MCP origin', 403);
+		if (!mcpMethods.includes(event.request.method)) {
+			return withCors(new Response(null, { status: 405, headers: { Allow: mcpMethods.join(', ') } }), event.request);
+		}
+		if (event.request.method === 'OPTIONS') {
+			return new Response(null, { status: 204, headers: corsHeaders(event.request) });
+		}
+		return withCors(await resolve(event), event.request);
+	}
+
 	let accessOwner: App.Locals['user'] = null;
 	{
 		if (!event.platform?.env) return jsonError('Cloudflare Access is not configured', 503);
@@ -150,13 +151,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 				headers: { 'Content-Type': 'application/json' }
 			});
 		}
-	}
-
-	if (isMcpPath(pathname)) {
-		if (event.request.method === 'OPTIONS') {
-			return new Response(null, { status: 204, headers: corsHeaders(event.request) });
-		}
-		return withCors(await resolve(event), event.request);
 	}
 
 	if (db) {

@@ -151,6 +151,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
 		instructions:
 			`Mail tools for ${ctx.user.name} <${ctx.user.email}> on ${new URL(ctx.origin).host}. ` +
 			'Ids returned by list_threads/search_mail can be passed to get_thread, reply, update_thread and list_attachments. ' +
+			'Send, reply, and change mail only when the user requests that action. Never automatically reply to incoming mail. ' +
 			UNTRUSTED_CONTENT
 	});
 	const canRead = hasScope(ctx.scopes, 'mail:read');
