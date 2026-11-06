@@ -41,30 +41,33 @@ function hostFrom(value: string | null | undefined): string | null {
 	try {
 		const url = new URL(value);
 		if (url.protocol === 'http:' || url.protocol === 'https:') return url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-		return url.protocol.replace(/:$/, '').toLowerCase();
+		// Native Cursor callbacks have a known scheme; arbitrary schemes cannot assert a web domain.
+		return /^(cursor|cursor-retrieval):$/.test(url.protocol) ? url.protocol.slice(0, -1) : null;
 	} catch {
 		return null;
 	}
 }
 
-/**
- * Brand marks come only from independently attributable hosts (metadata URL,
- * registered client_uri, or redirect URI). A self-declared `client_name` of
- * "Claude" is not enough — anyone can register that.
- */
+/** Brand marks follow the selected callback, never a self-declared name or website. */
 export function clientBrand(client: BrandableClient): ClientBrand | null {
-	const hosts = [hostFrom(client.client_id), hostFrom(client.client_uri), hostFrom(client.redirect_uri)].filter(
-		(host): host is string => Boolean(host)
-	);
-	for (const host of hosts) {
-		for (const brand of BRANDS) {
-			if (brand.match.test(host)) {
-				const { match: _match, ...rest } = brand;
-				return rest;
-			}
+	const host = hostFrom(client.redirect_uri);
+	if (!host) return null;
+	for (const brand of BRANDS) {
+		if (brand.match.test(host)) {
+			const { match: _match, ...rest } = brand;
+			return rest;
 		}
 	}
 	return null;
+}
+
+export function clientWebsite(client: BrandableClient): string | null {
+	if (!client.client_uri || !client.redirect_uri) return null;
+	try {
+		const website = new URL(client.client_uri);
+		return website.protocol === 'https:' && website.origin === new URL(client.redirect_uri).origin
+			? website.href : null;
+	} catch { return null; }
 }
 
 /** Two-letter fallback for clients we do not recognise. */

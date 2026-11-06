@@ -13,6 +13,7 @@ import {
 	type OAuthScope
 } from '$lib/server/oauth';
 import { loginHref } from '$lib/next-url';
+import { clientWebsite } from '$lib/oauth-brand';
 import { isOwnerMcpUser, ownerMcpOrigin } from '$lib/server/owner-access';
 
 /**
@@ -166,7 +167,7 @@ export const load: PageServerLoad = async ({ url, locals, platform, fetch, setHe
 			client: {
 				client_id: request.client.client_id,
 				client_name: request.client.client_name,
-				client_uri: request.client.client_uri,
+				client_uri: clientWebsite({ ...request.client, redirect_uri: request.redirectUri }),
 				logo_uri: request.client.logo_uri
 			},
 			redirectUri: request.redirectUri,

@@ -23,9 +23,25 @@ Access requests retain the owner's browser-session permissions; API-key send-dis
 
 ## Use Fleet Mail in ChatGPT
 
-Add `https://mail.significanthobbies.com/mcp` as a custom MCP server with OAuth authentication. ChatGPT discovers the existing authorization server, then sends you to an Access-protected consent page. Only the configured owner can authorize mail access. No OpenAI API key or local tunnel is required.
+After deployment and the live checks below, add `https://mail.significanthobbies.com/mcp` as a custom MCP server with OAuth authentication. ChatGPT discovers the existing authorization server, then sends you to an Access-protected consent page. Only the configured owner can authorize mail access. No OpenAI API key or local tunnel is required.
 
 The exact machine endpoints permit OAuth discovery, client registration and token exchange. Browser/REST routes and the consent page retain Cloudflare Access. MCP accepts only owner OAuth grants bound to this instance's canonical resource, with the granted read/send scopes. Password, pairing and API-key login remain closed. The OAuth revocation endpoint invalidates an app's token family; owner-authenticated grant management remains available through the existing API.
+
+At Cloudflare Access, add exact public path overrides only to the `mail.significanthobbies.com` destination:
+
+```text
+/mcp
+/oauth/register
+/oauth/token
+/oauth/revoke
+/.well-known/oauth-authorization-server
+/.well-known/oauth-protected-resource
+/.well-known/oauth-protected-resource/mcp
+```
+
+Keep the original Workers hostname and owner policy unchanged. Never exempt `/oauth/authorize`, browser/REST paths, or a wildcard such as `/oauth/*`. MCP still requires an owner OAuth token after the edge exception.
+
+Before calling the connection ready, verify anonymous metadata returns 200, `/mcp` returns a 401 OAuth challenge, and `/oauth/authorize`, `/inbox`, and `/api/mail` still require Access. Then complete owner consent in ChatGPT and verify a real `tools/list` and read call. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for the qualified deployment state.
 
 Hosted sends retain the API send switch and the default 100-send daily limit. There are no automatic replies. Run `pnpm run test:hosted-mcp` for the access boundary, OAuth exchange and tool-contract checks.
 

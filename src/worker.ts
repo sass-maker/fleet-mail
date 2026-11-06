@@ -1,4 +1,5 @@
 import type { ExecutionContext } from '@cloudflare/workers-types';
+import { prepareOAuthFormRequest } from './lib/server/oauth-form-request';
 import {
 	handleCloudflareInbound,
 	type CloudflareInboundEnv,
@@ -19,11 +20,12 @@ const svelteApp = sveltekit as SvelteKitWorker;
  * SvelteKit and adds Cloudflare Email Service's `email()` handler.
  */
 export default {
-	fetch(request: Request, env: Env, ctx: ExecutionContext) {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
 		if (typeof svelteApp.fetch !== 'function') {
 			throw new Error('SvelteKit worker export is missing fetch');
 		}
-		return svelteApp.fetch(request, env, ctx);
+		const prepared = await prepareOAuthFormRequest(request);
+		return prepared instanceof Response ? prepared : svelteApp.fetch(prepared, env, ctx);
 	},
 
 	async email(message: CloudflareInboundMessage, env: Env, ctx: ExecutionContext) {
