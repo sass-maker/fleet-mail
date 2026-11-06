@@ -27,7 +27,7 @@ Dedicated Worker `fleet-mail`, D1 `fleet-mail`, R2 `fleet-mail-attachments`. All
 `cli/fleet-mcp.ts` connects a local Codex stdio MCP server to the existing REST API with the owner's Cloudflare Access session. It reuses the CLI mail tools and adds sending-identity discovery. It does not change catch-all rules or run automatic replies. Mail send/reply delivery through this connection has not been exercised.
 
 ## Hosted agent connection source — 2026-11-06
-The hosted `/mcp` source uses existing OAuth with an exact machine-route allowlist and resource-bound owner grants. Consent stays behind signed owner-only Access. Hosted sending uses the existing API switch and daily budget. This section describes the source change; production deployment and the ChatGPT connection still need live verification.
+The hosted `/mcp` deployment uses OAuth with an exact machine-route allowlist and resource-bound owner grants. Consent stays behind signed owner-only Access. On 2026-11-06, live owner consent, PKCE exchange, mailbox reads, refresh rotation and revocation passed; anonymous MCP calls returned 401 while browser/REST routes retained Access. All ten tools are available, with sending enabled under the existing daily budget of 100. No test email was sent. The ChatGPT plugin has been created; its authorization and a ChatGPT tool call still need verification.
 
 ## Next
 Use the domain-filtered inbox. Per-address inbox navigation and historical mail migration are outside the owner's current scope.

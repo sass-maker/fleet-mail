@@ -402,7 +402,9 @@ async function fetchClientMetadataDocument(
 	try {
 		response = await fetchImpl(clientId, {
 			headers: { accept: 'application/json' },
-			redirect: 'error',
+			// Workers supports manual/follow only. Reject non-2xx below without
+			// following a metadata redirect to an unvalidated destination.
+			redirect: 'manual',
 			signal: controller.signal
 		});
 	} catch {
@@ -424,7 +426,13 @@ async function fetchClientMetadataDocument(
 		throw new OAuthError('invalid_client', 'Client metadata document client_id does not match', 401);
 	}
 	try {
-		return parseClientMetadata(doc);
+		// A metadata document can advertise multiple authentication methods.
+		// This server selects public PKCE only when the client supports it.
+		const metadata = doc as Record<string, unknown>;
+		const methods = metadata.token_endpoint_auth_methods_supported;
+		return parseClientMetadata(Array.isArray(methods) && methods.includes('none')
+			? { ...metadata, token_endpoint_auth_method: 'none' }
+			: metadata);
 	} catch (error) {
 		if (error instanceof OAuthError) throw new OAuthError('invalid_client', error.message, 401);
 		throw error;

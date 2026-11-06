@@ -8,7 +8,7 @@ import { actions as consentActions, load as consentLoad } from '../../routes/oau
 import { createApiToken } from './api-tokens';
 import { getUserByEmail } from './auth';
 import { ownerMcpMethods, ownerMcpOrigin } from './owner-access';
-import { getUserByOAuthToken, issueAuthorizationCode, issueGrant, registerClient, revokeToken } from './oauth';
+import { getClient, getUserByOAuthToken, issueAuthorizationCode, issueGrant, registerClient, revokeToken } from './oauth';
 import { createTestDb, insertTestUser } from './test-db';
 
 const origin = 'https://mail.example.com';
@@ -48,6 +48,45 @@ async function fixture() {
 }
 
 describe('owner hosted MCP boundary', () => {
+	test('metadata clients negotiate public PKCE and use Workers-compatible non-following fetch', async () => {
+		const { db } = await fixture();
+		const clientId = 'https://client.example/oauth/client.json';
+		const metadata = { client_id: clientId, client_name: 'ChatGPT',
+			redirect_uris: ['https://chatgpt.com/connector_platform_oauth_redirect'],
+			token_endpoint_auth_method: 'private_key_jwt',
+			token_endpoint_auth_methods_supported: ['none', 'private_key_jwt'] };
+		const fetchMetadata = (async (input, init) => {
+			assert.equal(input, clientId);
+			if (init?.redirect === 'error') throw new TypeError('Unsupported redirect mode in Workers');
+			assert.equal(init?.redirect, 'manual');
+			return Response.json(metadata);
+		}) as typeof fetch;
+		const client = await getClient(db, clientId, fetchMetadata);
+		assert.deepEqual(client?.redirect_uris, metadata.redirect_uris);
+		await assert.rejects(registerClient(db, metadata), /Only public clients are supported/);
+	});
+
+	test('metadata clients reject redirects, mismatched documents and unsupported authentication', async () => {
+		for (const kind of ['redirect', 'mismatch', 'private-only']) {
+			const { db } = await fixture();
+			const clientId = `https://${kind}.example/client.json`;
+			let calls = 0;
+			let redirectMode: RequestRedirect | undefined;
+			const fetchMetadata = (async (_input, init) => {
+				calls++;
+				redirectMode = init?.redirect;
+				if (kind === 'redirect') return new Response(null, { status: 302, headers: { location: 'https://127.0.0.1/private' } });
+				return Response.json({ client_id: kind === 'mismatch' ? 'https://other.example/client.json' : clientId,
+					redirect_uris: ['https://client.example/callback'], token_endpoint_auth_method: 'private_key_jwt',
+					token_endpoint_auth_methods_supported: kind === 'private-only' ? ['private_key_jwt'] : ['none'] });
+			}) as typeof fetch;
+			const reason = kind === 'redirect' ? /unavailable/ : kind === 'mismatch' ? /does not match/ : /Only public clients/;
+			await assert.rejects(getClient(db, clientId, fetchMetadata), reason);
+			assert.equal(redirectMode, 'manual');
+			assert.equal(calls, 1);
+		}
+	});
+
 	test('models exact machine routes and methods, with complete canonical configuration', () => {
 		assert.deepEqual(ownerMcpMethods('/mcp'), ['GET', 'POST', 'OPTIONS']);
 		assert.deepEqual(ownerMcpMethods('/oauth/token'), ['POST', 'OPTIONS']);
