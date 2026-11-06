@@ -4,7 +4,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { handle } from '../../hooks.server';
 import { POST as mcpPost, GET as mcpGet } from '../../routes/mcp/+server';
 import { POST as tokenPost } from '../../routes/oauth/token/+server';
-import { actions as consentActions } from '../../routes/oauth/authorize/+page.server';
+import { actions as consentActions, load as consentLoad } from '../../routes/oauth/authorize/+page.server';
 import { createApiToken } from './api-tokens';
 import { getUserByEmail } from './auth';
 import { ownerMcpMethods, ownerMcpOrigin } from './owner-access';
@@ -165,6 +165,21 @@ describe('owner hosted MCP boundary', () => {
 			refresh_token: tokens.refresh_token, resource: `${origin}/mcp` });
 		assert.equal(refreshed.status, 200);
 		assert.equal(await getUserByOAuthToken(db, tokens.access_token, `${origin}/mcp`), null);
+	});
+
+	test('consent never exposes a self-declared logo or mismatched website', async () => {
+		const { event, db } = await fixture();
+		const redirectUri = 'https://foreign.example/callback';
+		const client = await registerClient(db, { client_name: 'ChatGPT', redirect_uris: [redirectUri],
+			client_uri: 'https://chatgpt.com', logo_uri: 'https://foreign.example/openai.png' });
+		const params = new URLSearchParams({ client_id: client.client_id, redirect_uri: redirectUri,
+			response_type: 'code', scope: 'mail:read', resource: `${origin}/mcp`, code_challenge: challenge,
+			code_challenge_method: 'S256' });
+		const request = event(`/oauth/authorize?${params}`, { method: 'GET' });
+		request.locals.user = (await getUserByEmail(db, 'owner@example.com'))!;
+		const result = await consentLoad(request as never) as { request: { client: { logo_uri: string | null; client_uri: string | null } } };
+		assert.equal(result.request.client.logo_uri, null);
+		assert.equal(result.request.client.client_uri, null);
 	});
 
 	test('consent rejects a different submitted account before issuing a code', async () => {

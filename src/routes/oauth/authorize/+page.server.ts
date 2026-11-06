@@ -168,7 +168,7 @@ export const load: PageServerLoad = async ({ url, locals, platform, fetch, setHe
 				client_id: request.client.client_id,
 				client_name: request.client.client_name,
 				client_uri: clientWebsite({ ...request.client, redirect_uri: request.redirectUri }),
-				logo_uri: request.client.logo_uri
+				logo_uri: null
 			},
 			redirectUri: request.redirectUri,
 			scope: request.scope,
