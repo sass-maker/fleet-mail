@@ -7,12 +7,14 @@ import { startMcpServer } from './mcp.ts';
 export const FLEET_MAIL_ORIGIN = 'https://mail.significanthobbies.com';
 const execute = promisify(execFile);
 
+class FleetMcpConfigurationError extends Error {}
+
 export function fleetMailOrigin(value: string): string {
 	let url: URL;
-	try { url = new URL(value); } catch { throw new Error('Fleet Mail URL must be an HTTPS origin.'); }
+	try { url = new URL(value); } catch { throw new FleetMcpConfigurationError('Fleet Mail URL must be an HTTPS origin.'); }
 	if (url.protocol !== 'https:' || url.username || url.password ||
 		url.pathname !== '/' || url.search || url.hash) {
-		throw new Error('Fleet Mail URL must be an HTTPS origin without credentials, path, query, or fragment.');
+		throw new FleetMcpConfigurationError('Fleet Mail URL must be an HTTPS origin without credentials, path, query, or fragment.');
 	}
 	return url.origin;
 }
@@ -51,7 +53,7 @@ export function cloudflareAccessAuthentication(
 
 export async function startFleetMcp(args = process.argv.slice(2)): Promise<void> {
 	if (args.length !== 0 && (args.length !== 2 || args[0] !== '--url')) {
-		throw new Error('Usage: bun cli/fleet-mcp.ts [--url https://your-mail-origin]');
+		throw new FleetMcpConfigurationError('Usage: bun cli/fleet-mcp.ts [--url https://your-mail-origin]');
 	}
 	const origin = fleetMailOrigin(args[1] ?? FLEET_MAIL_ORIGIN);
 	await startMcpServer({
@@ -61,8 +63,10 @@ export async function startFleetMcp(args = process.argv.slice(2)): Promise<void>
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-	startFleetMcp().catch(() => {
-		console.error('Fleet Mail MCP failed to start. Check the command and installed dependencies.');
+	startFleetMcp().catch((error: unknown) => {
+		console.error(error instanceof FleetMcpConfigurationError
+			? error.message
+			: 'Fleet Mail MCP failed to start. Check the command and installed dependencies.');
 		process.exitCode = 1;
 	});
 }

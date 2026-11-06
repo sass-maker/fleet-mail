@@ -149,7 +149,12 @@ export class QuickInboxClient {
 				...(access ? { redirect: 'manual' as const, signal: init.signal ?? AbortSignal.timeout(30_000) } : {})
 			});
 		} catch (error) {
-			if (access) throw new QuickInboxError(502, 'Fleet Mail request failed. Check the connection before retrying.');
+			if (access) {
+				const message = ['GET', 'HEAD', 'OPTIONS'].includes((init.method ?? 'GET').toUpperCase())
+					? 'Fleet Mail request failed. Check the connection before retrying.'
+					: 'Fleet Mail request did not complete; its outcome is unknown. A send or reply may already have been delivered. Retry sending only with the same idempotency_key.';
+				throw new QuickInboxError(502, message);
+			}
 			throw error;
 		}
 		if (access && ((response.status >= 300 && response.status < 400) ||

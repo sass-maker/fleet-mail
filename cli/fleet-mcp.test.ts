@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { describe, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { QuickInboxClient } from './client.ts';
@@ -15,6 +17,18 @@ describe('Fleet Mail Access authentication', () => {
 		for (const value of ['http://mail.example.com', `${origin}/api`, `${origin}?token=bad`,
 			`${origin}#fragment`, 'https://user:password@mail.example.com', 'not a url']) {
 			assert.throws(() => fleetMailOrigin(value), /HTTPS origin/);
+		}
+	});
+
+	test('reports safe configuration errors at the stdio entrypoint', () => {
+		for (const [args, expected] of [
+			[['--url', 'http://invalid.example.com'], /HTTPS origin/],
+			[['--unexpected'], /Usage: bun cli\/fleet-mcp.ts/]
+		] as const) {
+			const result = spawnSync(process.execPath, [fileURLToPath(new URL('./fleet-mcp.ts', import.meta.url)), ...args], { encoding: 'utf8' });
+			assert.equal(result.status, 1);
+			assert.match(result.stderr, expected);
+			assert.equal(result.stdout, '');
 		}
 	});
 
@@ -90,7 +104,9 @@ describe('Fleet Mail Access authentication', () => {
 		try {
 			const client = new QuickInboxClient(origin, { kind: 'cloudflare-access', headers: async () => ({ 'cf-access-token': 'session' }) });
 			await assert.rejects(client.sendMessage({ to: 'someone@example.com', subject: 'Test', text: 'Test', idempotencyKey: 'send-once' }),
-				(error: unknown) => error instanceof Error && /Fleet Mail request failed/.test(error.message) && !error.message.includes('private-session-token'));
+				(error: unknown) => error instanceof Error && /outcome is unknown/.test(error.message) &&
+					/may already have been/.test(error.message) && /same idempotency_key/.test(error.message) &&
+					!error.message.includes('private-session-token'));
 			assert.equal(attempts, 1);
 		} finally { globalThis.fetch = originalFetch; }
 	});
