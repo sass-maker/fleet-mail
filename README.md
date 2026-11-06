@@ -43,7 +43,7 @@ Keep the original Workers hostname and owner policy unchanged. Never exempt `/oa
 
 Before calling the connection ready, verify anonymous metadata returns 200, `/mcp` returns a 401 OAuth challenge, and `/oauth/authorize`, `/inbox`, and `/api/mail` still require Access. Then complete owner consent in ChatGPT and verify a real `tools/list` and read call. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for the qualified deployment state.
 
-Hosted sends retain the API send switch and the default 100-send daily limit. There are no automatic replies. Run `pnpm run test:hosted-mcp` for the access boundary, OAuth exchange and tool-contract checks.
+This deployment sets `API_DAILY_SEND_LIMIT=1000`: hosted sends share a 1,000-send allowance per owner per UTC day across all domains, subject to Cloudflare's account-wide quota and any other account usage. The API send switch remains available. There are no automatic replies. Run `pnpm run test:hosted-mcp` for the access boundary, OAuth exchange and tool-contract checks.
 
 ---
 
